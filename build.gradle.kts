@@ -200,7 +200,11 @@ kotlin {
         binaries.framework { baseName = "AssertCmd"; xcf.add(this) }
     }
     iosSimulatorArm64 {
-        binaries.framework { baseName = "AssertCmd"; xcf.add(this) }
+        binaries.framework {
+            baseName = "AssertCmd"
+            isStatic = true
+            xcf.add(this)
+        }
     }
     iosX64 {
         binaries.framework { baseName = "AssertCmd"; xcf.add(this) }
