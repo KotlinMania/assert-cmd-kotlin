@@ -50,9 +50,10 @@ internal class Styled(
      * Render the inner display surrounded by the style's ANSI introducer and reset codes.
      * Mirrors the alternate branch of the upstream Rust `Display::fmt` implementation (`{:#}`).
      */
-    internal fun renderStyled(): String = buildString {
-        style.render().formatTo(this)
-        append(display.toString())
-        style.renderReset().formatTo(this)
-    }
+    internal fun renderStyled(): String =
+        buildString {
+            style.render().formatTo(this)
+            append(display.toString())
+            style.renderReset().formatTo(this)
+        }
 }
