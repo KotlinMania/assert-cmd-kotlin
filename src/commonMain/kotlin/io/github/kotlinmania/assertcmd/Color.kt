@@ -22,6 +22,8 @@ internal data class Palette(
     internal fun value(display: Any): Styled = Styled(display, value)
 
     internal companion object {
+        internal fun new(key: Style = Style(), value: Style = Style()): Palette = Palette(key, value)
+
         internal fun color(): Palette =
             if (COLOR_FEATURE) {
                 Palette(
@@ -56,4 +58,15 @@ internal class Styled(
             append(display.toString())
             style.renderReset().formatTo(this)
         }
+
+    internal fun fmt(alternate: Boolean = false): String =
+        if (alternate) {
+            renderStyled()
+        } else {
+            toString()
+        }
+
+    internal companion object {
+        internal fun new(display: Any, style: Style): Styled = Styled(display, style)
+    }
 }

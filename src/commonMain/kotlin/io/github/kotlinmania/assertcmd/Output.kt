@@ -2,21 +2,64 @@
 package io.github.kotlinmania.assertcmd
 
 /**
+ * Result of an output operation.
+ */
+public typealias OutputResult = Result<Output>
+
+/**
+ * Converts a type to an [OutputResult].
+ */
+public interface OutputOkExt {
+    /**
+     * Convert an [Output] to an [OutputResult].
+     */
+    public fun ok(): OutputResult
+
+    /**
+     * Unwrap an [Output] with a detailed diagnostic error if unsuccessful.
+     */
+    public fun unwrap(): Output
+
+    /**
+     * Unwrap an [Output] expecting failure, or throw with standard output diagnostics.
+     */
+    public fun unwrapErr(): OutputError
+}
+
+/**
  * Exit status of a process.
  */
-data class ExitStatus(
-    val code: Int? = null,
-    val success: Boolean = code == 0,
+public data class ExitStatus(
+    public val code: Int? = null,
+    public val success: Boolean = code == 0,
 )
 
 /**
  * Process output representation.
  */
-data class Output(
-    val status: ExitStatus,
-    val stdout: ByteArray = ByteArray(0),
-    val stderr: ByteArray = ByteArray(0),
-) {
+public data class Output(
+    public val status: ExitStatus,
+    public val stdout: ByteArray = ByteArray(0),
+    public val stderr: ByteArray = ByteArray(0),
+) : OutputOkExt {
+    override fun ok(): OutputResult =
+        if (status.success) {
+            Result.success(this)
+        } else {
+            Result.failure(OutputError.new(this))
+        }
+
+    override fun unwrap(): Output = ok().getOrThrow()
+
+    override fun unwrapErr(): OutputError =
+        if (status.success) {
+            error(
+                "Command completed successfully\nstdout=```${DebugBytes(stdout)}```",
+            )
+        } else {
+            OutputError.new(this)
+        }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Output) return false
@@ -31,69 +74,54 @@ data class Output(
         result = 31 * result + stderr.contentHashCode()
         return result
     }
+
+    public fun fmt(): String =
+        buildString {
+            outputFmt(this@Output, this)
+        }
+
+    override fun toString(): String = fmt()
 }
-
-/**
- * Converts an [Output] to a [Result] or unwraps it with descriptive messages.
- */
-fun Output.ok(): Result<Output> =
-    if (status.success) {
-        Result.success(this)
-    } else {
-        Result.failure(OutputError(this))
-    }
-
-/**
- * Unwrap an [Output] or throw with a detailed diagnostic message.
- */
-fun Output.unwrap(): Output =
-    ok().getOrThrow()
-
-/**
- * Unwrap an [Output] expecting failure, or throw with standard output diagnostics.
- */
-fun Output.unwrapErr(): OutputError =
-    if (status.success) {
-        error(
-            "Command completed successfully\nstdout=```${DebugBytes(stdout)}```",
-        )
-    } else {
-        OutputError(this)
-    }
 
 /**
  * Detailed error produced by command execution or assertion failure.
  */
-class OutputError internal constructor(
+public class OutputError internal constructor(
     private var cmd: String? = null,
     private var stdin: ByteArray? = null,
-    private val errorCause: OutputCause,
+    private var errorCause: OutputCause,
 ) : Exception((errorCause as? OutputCause.Unexpected)?.throwable) {
-    constructor(output: Output) : this(
+    public fun fmt(): String = message
+    public constructor(output: Output) : this(
         cmd = null,
         stdin = null,
         errorCause = OutputCause.Expected(output),
     )
 
-    constructor(cause: Throwable) : this(
+    public constructor(cause: Throwable) : this(
         cmd = null,
         stdin = null,
         errorCause = OutputCause.Unexpected(cause),
     )
 
-    fun setCmd(cmd: String): OutputError {
+    public fun withCause(cause: Throwable): OutputError {
+        this.errorCause = OutputCause.Unexpected(cause)
+        return this
+    }
+
+    public fun setCmd(cmd: String): OutputError {
         this.cmd = cmd
         return this
     }
 
-    fun setStdin(stdin: ByteArray): OutputError {
+    public fun setStdin(stdin: ByteArray): OutputError {
         this.stdin = stdin.copyOf()
         return this
     }
 
-    fun asOutput(): Output? =
-        when (errorCause) {
-            is OutputCause.Expected -> errorCause.output
+    public fun asOutput(): Output? =
+        when (val cause = errorCause) {
+            is OutputCause.Expected -> cause.output
             is OutputCause.Unexpected -> null
         }
 
@@ -107,17 +135,25 @@ class OutputError internal constructor(
                 if (stdin != null) {
                     appendLine("${palette.key("stdin").renderStyled()}=${palette.value(DebugBytes(stdin!!)).renderStyled()}")
                 }
-                when (errorCause) {
-                    is OutputCause.Expected -> outputFmt(errorCause.output, this)
-                    is OutputCause.Unexpected -> append(errorCause.throwable.message ?: errorCause.throwable.toString())
+                when (val cause = errorCause) {
+                    is OutputCause.Expected -> outputFmt(cause.output, this)
+                    is OutputCause.Unexpected -> append(cause.throwable.message ?: cause.throwable.toString())
                 }
             }
         }
 
     override fun toString(): String = message
+
+    public companion object {
+        public fun new(output: Output): OutputError = OutputError(output)
+
+        public fun withCause(cause: Throwable): OutputError = OutputError(cause)
+    }
 }
 
 internal sealed class OutputCause {
+    internal fun fmt(): String = toString()
+
     data class Expected(
         val output: Output,
     ) : OutputCause()
@@ -138,6 +174,8 @@ internal fun outputFmt(output: Output, builder: StringBuilder) {
 internal class DebugBytes(
     private val bytes: ByteArray,
 ) {
+    internal fun fmt(): String = toString()
+
     override fun toString(): String =
         buildString {
             formatBytes(bytes, this)
@@ -147,6 +185,8 @@ internal class DebugBytes(
 internal class DebugBuffer(
     private val buffer: ByteArray,
 ) {
+    internal fun fmt(): String = toString()
+
     override fun toString(): String =
         buildString {
             formatBytes(buffer, this)
