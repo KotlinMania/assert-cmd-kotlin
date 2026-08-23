@@ -171,6 +171,34 @@ fun registerCodeqlCompileTask(
                     .joinToString(File.pathSeparator) { it.absolutePath }
             val commonSourceFiles = commonSources.files.toMutableList()
             val sourceFiles = sources.files.toMutableList()
+
+            val stubAnstyle = dummySourceDir.get().file("ai/solace/tui/anstyle/AnstyleStub.kt").asFile
+            stubAnstyle.parentFile.mkdirs()
+            stubAnstyle.writeText(
+                "package ai.solace.tui.anstyle\n\n" +
+                    "public class Display {\n" +
+                    "    public fun formatTo(appendable: Appendable) {}\n" +
+                    "}\n\n" +
+                    "public class Style {\n" +
+                    "    public fun render(): Display = Display()\n" +
+                    "    public fun renderReset(): Display = Display()\n" +
+                    "    public fun effects(effects: Effects): Style = this\n" +
+                    "}\n\n" +
+                    "public class Effects {\n" +
+                    "    public companion object {\n" +
+                    "        public val PLAIN: Effects = Effects()\n" +
+                    "        public val BOLD: Effects = Effects()\n" +
+                    "    }\n" +
+                    "}\n\n" +
+                    "public enum class AnsiColor {\n" +
+                    "    Black, Red, Green, Yellow, Blue, Magenta, Cyan, White, BrightBlack;\n" +
+                    "    public fun onDefault(): Style = Style()\n" +
+                    "}\n\n" +
+                    "public infix fun Style.or(effects: Effects): Style = this\n",
+            )
+            commonSourceFiles.add(stubAnstyle)
+            sourceFiles.add(stubAnstyle)
+
             // If no real sources were found, use the dummy source generated in onlyIf.
             if (commonSourceFiles.isEmpty()) {
                 commonSourceFiles.add(dummySourceFile.get().asFile)
