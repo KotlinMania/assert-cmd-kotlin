@@ -1,4 +1,4 @@
-// port-lint: source src/color.rs
+// port-lint: source color.rs
 package io.github.kotlinmania.assertcmd
 
 import ai.solace.tui.anstyle.AnsiColor
