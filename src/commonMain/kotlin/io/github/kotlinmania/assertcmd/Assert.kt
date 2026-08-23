@@ -2,258 +2,375 @@
 package io.github.kotlinmania.assertcmd
 
 /**
+ * Assert the state of an [Output].
+ */
+public interface OutputAssertExt {
+    /**
+     * Wrap with an interface that provides assertions on the [Output].
+     */
+    public fun assert(): Assert
+}
+
+/**
  * Extension to wrap [Output] in an [Assert] assertion interface.
  */
-fun Output.assert(): Assert = Assert(this)
+public fun Output.assert(): Assert = Assert.new(this)
+
+/**
+ * Result of an assertion operation.
+ */
+public typealias AssertResult = Result<Assert>
 
 /**
  * Assertion interface over [Output].
  */
-class Assert(
-    val output: Output,
-    val context: MutableList<Pair<String, Any>> = mutableListOf(),
+public class Assert(
+    public val output: Output,
+    public val context: MutableList<Pair<String, Any>> = mutableListOf(),
 ) {
-    fun appendContext(name: String, contextValue: Any): Assert {
+    public fun appendContext(name: String, contextValue: Any): Assert {
         context.add(name to contextValue)
         return this
     }
 
-    fun success(): Assert =
-        trySuccess().getOrThrow()
+    @kotlin.jvm.JvmName("outputValue")
+    public fun getOutput(): Output = output
 
-    fun trySuccess(): Result<Assert> =
+    public fun intoError(reason: AssertReason): AssertError = AssertError(this, reason)
+
+    public fun success(): Assert = trySuccess().getOrThrow()
+
+    public fun trySuccess(): AssertResult =
         if (!output.status.success) {
-            Result.failure(AssertError(this, AssertReason.UnexpectedFailure(output.status.code)))
+            Result.failure(intoError(AssertReason.UnexpectedFailure(output.status.code)))
         } else {
             Result.success(this)
         }
 
-    fun failure(): Assert =
-        tryFailure().getOrThrow()
+    public fun failure(): Assert = tryFailure().getOrThrow()
 
-    fun tryFailure(): Result<Assert> =
+    public fun tryFailure(): AssertResult =
         if (output.status.success) {
-            Result.failure(AssertError(this, AssertReason.UnexpectedSuccess))
+            Result.failure(intoError(AssertReason.UnexpectedSuccess))
         } else {
             Result.success(this)
         }
 
-    fun interrupted(): Assert =
-        tryInterrupted().getOrThrow()
+    public fun interrupted(): Assert = tryInterrupted().getOrThrow()
 
-    fun tryInterrupted(): Result<Assert> =
+    public fun tryInterrupted(): AssertResult =
         if (output.status.code != null) {
-            Result.failure(AssertError(this, AssertReason.UnexpectedCompletion))
+            Result.failure(intoError(AssertReason.UnexpectedCompletion))
         } else {
             Result.success(this)
         }
 
-    fun code(expectedCode: Int): Assert =
-        tryCode(expectedCode).getOrThrow()
+    public fun code(expectedCode: Int): Assert = tryCode(expectedCode).getOrThrow()
 
-    fun tryCode(expectedCode: Int): Result<Assert> {
-        val actual =
-            output.status.code
-                ?: return Result.failure(AssertError(this, AssertReason.CommandInterrupted))
-        return if (actual == expectedCode) {
-            Result.success(this)
+    public fun code(expectedCodes: IntArray): Assert = tryCode(expectedCodes).getOrThrow()
+
+    public fun code(expectedCodes: List<Int>): Assert = tryCode(expectedCodes).getOrThrow()
+
+    public fun <P : Predicate<Int>> code(pred: IntoCodePredicate<P>): Assert = tryCode(pred).getOrThrow()
+
+    public fun tryCode(expectedCode: Int): AssertResult = tryCode(EqCodePredicate.new(expectedCode))
+
+    public fun tryCode(expectedCodes: IntArray): AssertResult = tryCode(InCodePredicate.new(expectedCodes.toList()))
+
+    public fun tryCode(expectedCodes: List<Int>): AssertResult = tryCode(InCodePredicate.new(expectedCodes))
+
+    public fun <P : Predicate<Int>> tryCode(pred: IntoCodePredicate<P>): AssertResult = codeImpl(pred.intoCode())
+
+    public fun codeImpl(pred: Predicate<Int>): AssertResult {
+        val actualCode = output.status.code ?: return Result.failure(intoError(AssertReason.CommandInterrupted))
+        val case = pred.findCase(false, actualCode)
+        return if (case != null) {
+            Result.failure(intoError(AssertReason.UnexpectedReturnCode(case.tree())))
         } else {
-            Result.failure(
-                AssertError(
-                    this,
-                    AssertReason.UnexpectedReturnCode("expected $expectedCode, found $actual"),
-                ),
-            )
+            Result.success(this)
         }
     }
 
-    fun code(expectedCodes: IntArray): Assert =
-        tryCode(expectedCodes).getOrThrow()
+    public fun stdout(expected: String): Assert = tryStdout(expected).getOrThrow()
 
-    fun tryCode(expectedCodes: IntArray): Result<Assert> {
-        val actual =
-            output.status.code
-                ?: return Result.failure(AssertError(this, AssertReason.CommandInterrupted))
-        return if (actual in expectedCodes) {
-            Result.success(this)
+    public fun stdout(expected: ByteArray): Assert = tryStdout(expected).getOrThrow()
+
+    public fun <P : Predicate<ByteArray>> stdout(pred: IntoOutputPredicate<P>): Assert = tryStdout(pred).getOrThrow()
+
+    public fun <P : Predicate<String>> stdout(pred: P): Assert = tryStdout(StrOutputPredicate.new(pred)).getOrThrow()
+
+    public fun stdout(pred: (String) -> Boolean): Assert = stdout(Predicate { pred(it) })
+
+    public fun tryStdout(expected: String): AssertResult = tryStdout(StrContentOutputPredicate.fromString(expected))
+
+    public fun tryStdout(expected: ByteArray): AssertResult = tryStdout(BytesContentOutputPredicate.new(expected))
+
+    public fun <P : Predicate<ByteArray>> tryStdout(pred: IntoOutputPredicate<P>): AssertResult = stdoutImpl(pred.intoOutput())
+
+    public fun stdoutImpl(pred: Predicate<ByteArray>): AssertResult {
+        val actual = output.stdout
+        val case = pred.findCase(false, actual)
+        return if (case != null) {
+            Result.failure(intoError(AssertReason.UnexpectedStdout(case.tree())))
         } else {
-            Result.failure(
-                AssertError(
-                    this,
-                    AssertReason.UnexpectedReturnCode(
-                        "expected one of ${expectedCodes.contentToString()}, found $actual",
-                    ),
-                ),
-            )
+            Result.success(this)
         }
     }
 
-    fun stdout(expected: String): Assert =
-        tryStdout(expected).getOrThrow()
+    public fun stderr(expected: String): Assert = tryStderr(expected).getOrThrow()
 
-    fun tryStdout(expected: String): Result<Assert> {
-        val actual = output.stdout.decodeToString()
-        return if (actual == expected) {
-            Result.success(this)
+    public fun stderr(expected: ByteArray): Assert = tryStderr(expected).getOrThrow()
+
+    public fun <P : Predicate<ByteArray>> stderr(pred: IntoOutputPredicate<P>): Assert = tryStderr(pred).getOrThrow()
+
+    public fun <P : Predicate<String>> stderr(pred: P): Assert = tryStderr(StrOutputPredicate.new(pred)).getOrThrow()
+
+    public fun stderr(pred: (String) -> Boolean): Assert = stderr(Predicate { pred(it) })
+
+    public fun tryStderr(expected: String): AssertResult = tryStderr(StrContentOutputPredicate.fromString(expected))
+
+    public fun tryStderr(expected: ByteArray): AssertResult = tryStderr(BytesContentOutputPredicate.new(expected))
+
+    public fun <P : Predicate<ByteArray>> tryStderr(pred: IntoOutputPredicate<P>): AssertResult = stderrImpl(pred.intoOutput())
+
+    public fun stderrImpl(pred: Predicate<ByteArray>): AssertResult {
+        val actual = output.stderr
+        val case = pred.findCase(false, actual)
+        return if (case != null) {
+            Result.failure(intoError(AssertReason.UnexpectedStderr(case.tree())))
         } else {
-            Result.failure(
-                AssertError(
-                    this,
-                    AssertReason.UnexpectedStdout("expected \"$expected\", found \"$actual\""),
-                ),
-            )
+            Result.success(this)
         }
     }
 
-    fun stdout(expected: ByteArray): Assert =
-        tryStdout(expected).getOrThrow()
+    public fun fmt(): String = toString()
 
-    fun tryStdout(expected: ByteArray): Result<Assert> =
-        if (output.stdout.contentEquals(expected)) {
-            Result.success(this)
-        } else {
-            Result.failure(
-                AssertError(
-                    this,
-                    AssertReason.UnexpectedStdout("byte content mismatch"),
-                ),
-            )
-        }
-
-    fun stdout(predicate: (String) -> Boolean): Assert =
-        tryStdoutPredicate(predicate).getOrThrow()
-
-    fun tryStdoutPredicate(predicate: (String) -> Boolean): Result<Assert> {
-        val actual = output.stdout.decodeToString()
-        return if (predicate(actual)) {
-            Result.success(this)
-        } else {
-            Result.failure(
-                AssertError(
-                    this,
-                    AssertReason.UnexpectedStdout("predicate failed for \"$actual\""),
-                ),
-            )
+    override fun toString(): String {
+        val palette = Palette.color()
+        return buildString {
+            for ((name, contextVal) in context) {
+                appendLine("${palette.key(name).renderStyled()}=`${palette.value(contextVal).renderStyled()}`")
+            }
+            outputFmt(output, this)
         }
     }
 
-    fun stderr(expected: String): Assert =
-        tryStderr(expected).getOrThrow()
-
-    fun tryStderr(expected: String): Result<Assert> {
-        val actual = output.stderr.decodeToString()
-        return if (actual == expected) {
-            Result.success(this)
-        } else {
-            Result.failure(
-                AssertError(
-                    this,
-                    AssertReason.UnexpectedStderr("expected \"$expected\", found \"$actual\""),
-                ),
-            )
-        }
-    }
-
-    fun stderr(expected: ByteArray): Assert =
-        tryStderr(expected).getOrThrow()
-
-    fun tryStderr(expected: ByteArray): Result<Assert> =
-        if (output.stderr.contentEquals(expected)) {
-            Result.success(this)
-        } else {
-            Result.failure(
-                AssertError(
-                    this,
-                    AssertReason.UnexpectedStderr("byte content mismatch"),
-                ),
-            )
-        }
-
-    fun stderr(predicate: (String) -> Boolean): Assert =
-        tryStderrPredicate(predicate).getOrThrow()
-
-    fun tryStderrPredicate(predicate: (String) -> Boolean): Result<Assert> {
-        val actual = output.stderr.decodeToString()
-        return if (predicate(actual)) {
-            Result.success(this)
-        } else {
-            Result.failure(
-                AssertError(
-                    this,
-                    AssertReason.UnexpectedStderr("predicate failed for \"$actual\""),
-                ),
-            )
-        }
+    public companion object {
+        public fun new(output: Output): Assert = Assert(output)
     }
 }
 
+public fun <P : Predicate<Int>> convertCode(pred: IntoCodePredicate<P>): P = pred.intoCode()
+
+public fun <P : Predicate<ByteArray>> convertOutput(pred: IntoOutputPredicate<P>): P = pred.intoOutput()
+
 /**
- * Reasons why an [Assert] check failed.
+ * Generic predicate interface.
  */
-sealed class AssertReason {
-    data class UnexpectedFailure(
+public fun interface Predicate<T> {
+    public fun eval(item: T): Boolean
+
+    public fun findCase(expected: Boolean, variable: T): Case? =
+        if (eval(variable) == expected) Case(this, expected) else null
+
+    public fun parameters(): Iterator<Parameter> = emptyList<Parameter>().iterator()
+
+    public fun children(): Iterator<Child> = emptyList<Child>().iterator()
+}
+
+public class Parameter(
+    public val name: String,
+    public val value: Any?,
+)
+
+public class Child(
+    public val name: String,
+    public val predicate: Predicate<*>,
+)
+
+public class Case(
+    public val predicate: Predicate<*>,
+    public val result: Boolean,
+) {
+    public fun tree(): CaseTree = CaseTree(this)
+}
+
+public class CaseTree(
+    public val case: Case,
+) {
+    public fun fmt(): String = toString()
+
+    override fun toString(): String = "${case.predicate}"
+}
+
+public interface IntoCodePredicate<P : Predicate<Int>> {
+    public fun intoCode(): P
+}
+
+public class EqCodePredicate(
+    public val expected: Int,
+) : Predicate<Int>,
+    IntoCodePredicate<EqCodePredicate> {
+    override fun eval(item: Int): Boolean = item == expected
+
+    override fun intoCode(): EqCodePredicate = this
+
+    public fun fmt(): String = toString()
+
+    override fun toString(): String = "var == $expected"
+
+    public companion object {
+        public fun new(value: Int): EqCodePredicate = EqCodePredicate(value)
+    }
+}
+
+public class InCodePredicate(
+    public val expected: List<Int>,
+) : Predicate<Int>,
+    IntoCodePredicate<InCodePredicate> {
+    override fun eval(item: Int): Boolean = item in expected
+
+    override fun intoCode(): InCodePredicate = this
+
+    public fun fmt(): String = toString()
+
+    override fun toString(): String = "var in $expected"
+
+    public companion object {
+        public fun new(value: Iterable<Int>): InCodePredicate = InCodePredicate(value.toList())
+    }
+}
+
+public interface IntoOutputPredicate<P : Predicate<ByteArray>> {
+    public fun intoOutput(): P
+}
+
+public class BytesContentOutputPredicate(
+    public val expected: ByteArray,
+) : Predicate<ByteArray>,
+    IntoOutputPredicate<BytesContentOutputPredicate> {
+    override fun eval(item: ByteArray): Boolean = expected.contentEquals(item)
+
+    override fun intoOutput(): BytesContentOutputPredicate = this
+
+    public fun fmt(): String = toString()
+
+    override fun toString(): String = "var == ${expected.decodeToString()}"
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is BytesContentOutputPredicate) return false
+        return expected.contentEquals(other.expected)
+    }
+
+    override fun hashCode(): Int = expected.contentHashCode()
+
+    public companion object {
+        public fun new(value: ByteArray): BytesContentOutputPredicate = BytesContentOutputPredicate(value)
+
+        public fun fromVec(value: List<Byte>): BytesContentOutputPredicate = BytesContentOutputPredicate(value.toByteArray())
+    }
+}
+
+public class StrContentOutputPredicate(
+    public val expected: String,
+) : Predicate<ByteArray>,
+    IntoOutputPredicate<StrContentOutputPredicate> {
+    override fun eval(item: ByteArray): Boolean = expected == item.decodeToString()
+
+    override fun intoOutput(): StrContentOutputPredicate = this
+
+    public fun fmt(): String = toString()
+
+    override fun toString(): String = "var == \"$expected\""
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is StrContentOutputPredicate) return false
+        return expected == other.expected
+    }
+
+    override fun hashCode(): Int = expected.hashCode()
+
+    public companion object {
+        public fun fromStr(value: String): StrContentOutputPredicate = StrContentOutputPredicate(value)
+
+        public fun fromString(value: String): StrContentOutputPredicate = StrContentOutputPredicate(value)
+    }
+}
+
+public class StrOutputPredicate<P : Predicate<String>>(
+    public val predicate: P,
+) : Predicate<ByteArray>,
+    IntoOutputPredicate<StrOutputPredicate<P>> {
+    override fun eval(item: ByteArray): Boolean = predicate.eval(item.decodeToString())
+
+    override fun intoOutput(): StrOutputPredicate<P> = this
+
+    public fun fmt(): String = toString()
+
+    override fun toString(): String = predicate.toString()
+
+    public companion object {
+        public fun <P : Predicate<String>> new(pred: P): StrOutputPredicate<P> = StrOutputPredicate(pred)
+    }
+}
+
+public class AssertError(
+    public val assert: Assert,
+    public val reason: AssertReason,
+) : Exception(reason.formatMessage(assert)) {
+    public fun panic(): Nothing = throw this
+
+    public fun assert(): Assert = assert
+
+    public fun fmt(): String = message ?: ""
+
+    public companion object {
+        public fun panic(err: AssertError): Nothing = err.panic()
+    }
+}
+
+public sealed class AssertReason {
+    public fun fmt(): String = toString()
+
+    public data class UnexpectedFailure(
         val actualCode: Int?,
     ) : AssertReason()
 
-    data object UnexpectedSuccess : AssertReason()
+    public object UnexpectedSuccess : AssertReason()
 
-    data object UnexpectedCompletion : AssertReason()
+    public object UnexpectedCompletion : AssertReason()
 
-    data object CommandInterrupted : AssertReason()
+    public object CommandInterrupted : AssertReason()
 
-    data class UnexpectedReturnCode(
-        val message: String,
+    public data class UnexpectedReturnCode(
+        val caseTree: CaseTree,
     ) : AssertReason()
 
-    data class UnexpectedStdout(
-        val message: String,
+    public data class UnexpectedStdout(
+        val caseTree: CaseTree,
     ) : AssertReason()
 
-    data class UnexpectedStderr(
-        val message: String,
+    public data class UnexpectedStderr(
+        val caseTree: CaseTree,
     ) : AssertReason()
-}
 
-/**
- * Exception thrown when an [Assert] assertion fails.
- */
-class AssertError(
-    val assert: Assert,
-    val reason: AssertReason,
-) : AssertionError(formatMessage(assert, reason)) {
-    companion object {
-        private fun formatMessage(assert: Assert, reason: AssertReason): String {
-            val palette = Palette.color()
-            return buildString {
-                for ((name, context) in assert.context) {
-                    appendLine("${palette.key(name).renderStyled()}=`${palette.value(context).renderStyled()}`")
+    internal fun formatMessage(assert: Assert): String =
+        buildString {
+            when (this@AssertReason) {
+                is UnexpectedFailure -> {
+                    appendLine("Unexpected failure.")
+                    appendLine("code=${actualCode ?: "<interrupted>"}")
+                    appendLine("stderr=```${DebugBytes(assert.output.stderr)}```")
                 }
-                outputFmt(assert.output, this)
-                when (reason) {
-                    is AssertReason.UnexpectedFailure -> {
-                        val code = reason.actualCode?.toString() ?: "<interrupted>"
-                        appendLine("Unexpected failure: exit code $code")
-                    }
-                    is AssertReason.UnexpectedSuccess -> {
-                        appendLine("Unexpected success")
-                    }
-                    is AssertReason.UnexpectedCompletion -> {
-                        appendLine("Unexpected completion (command was expected to be interrupted)")
-                    }
-                    is AssertReason.CommandInterrupted -> {
-                        appendLine("Command was interrupted")
-                    }
-                    is AssertReason.UnexpectedReturnCode -> {
-                        appendLine("Unexpected return code: ${reason.message}")
-                    }
-                    is AssertReason.UnexpectedStdout -> {
-                        appendLine("Unexpected stdout: ${reason.message}")
-                    }
-                    is AssertReason.UnexpectedStderr -> {
-                        appendLine("Unexpected stderr: ${reason.message}")
-                    }
-                }
+                is UnexpectedSuccess -> appendLine("Unexpected success")
+                is UnexpectedCompletion -> appendLine("Unexpected completion")
+                is CommandInterrupted -> appendLine("Command interrupted")
+                is UnexpectedReturnCode -> appendLine("Unexpected return code, failed $caseTree")
+                is UnexpectedStdout -> appendLine("Unexpected stdout, failed $caseTree")
+                is UnexpectedStderr -> appendLine("Unexpected stderr, failed $caseTree")
             }
+            append(assert.toString())
         }
-    }
 }
