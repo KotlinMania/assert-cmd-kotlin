@@ -101,10 +101,6 @@ class AssertTest {
         output.assert().stdout { it.contains("world") }
     }
 
-    private fun <P : Predicate<Int>> convertCode(pred: IntoCodePredicate<P>): P = pred.intoCode()
-
-    private fun <P : Predicate<ByteArray>> convertOutput(pred: IntoOutputPredicate<P>): P = pred.intoOutput()
-
     @Test
     fun intoCodeFromPred() {
         val pred = convertCode(EqCodePredicate.new(10))

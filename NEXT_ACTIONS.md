@@ -5,9 +5,9 @@ Based on AST analysis, here are the concrete next steps.
 ## Summary
 
 - **Files Present:** 8/8 (100.0%)
-- **Function parity:** 93/95 matched (target 194) — 97.9%
+- **Function parity:** 93/95 matched (target 193) — 97.9%
 - **Class/type parity:** 27/28 matched (target 49) — 96.4%
-- **Combined symbol parity:** 120/123 matched (target 243) — 97.6%
+- **Combined symbol parity:** 120/123 matched (target 242) — 97.6%
 - **Average inline-code cosine:** 0.49 (function body across 8 matched files)
 - **Average documentation cosine:** 0.28 (doc text across 8 matched files)
 - **Cheat-zeroed Files:** 1
@@ -30,10 +30,10 @@ Every matched file is listed below with function and type symbol parity.
 ### 1. assert
 
 - **Target:** `assertcmd.Assert`
-- **Similarity:** 0.51
+- **Similarity:** 0.50
 - **Dependents:** 1
-- **Priority Score:** 1035504.9
-- **Functions:** 39/41 matched (target 102)
+- **Priority Score:** 1035505.1
+- **Functions:** 39/41 matched (target 101)
 - **Missing functions:** `convert_code`, `convert_output`
 - **Types:** 13/14 matched (target 24)
 - **Missing types:** `Predicate`

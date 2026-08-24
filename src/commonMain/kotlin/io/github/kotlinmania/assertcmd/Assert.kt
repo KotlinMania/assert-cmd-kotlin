@@ -26,8 +26,9 @@ public typealias AssertResult = Result<Assert>
  */
 public class Assert(
     public val output: Output,
-    public val context: MutableList<Pair<String, Any>> = mutableListOf(),
 ) {
+    internal val context: MutableList<Pair<String, Any>> = mutableListOf()
+
     public fun appendContext(name: String, contextValue: Any): Assert {
         context.add(name to contextValue)
         return this
@@ -71,7 +72,7 @@ public class Assert(
 
     public fun code(expectedCodes: List<Int>): Assert = tryCode(expectedCodes).getOrThrow()
 
-    public fun <P : Predicate<Int>> code(pred: IntoCodePredicate<P>): Assert = tryCode(pred).getOrThrow()
+    public fun code(pred: IntoCodePredicate): Assert = tryCode(pred).getOrThrow()
 
     public fun tryCode(expectedCode: Int): AssertResult = tryCode(EqCodePredicate.new(expectedCode))
 
@@ -79,7 +80,7 @@ public class Assert(
 
     public fun tryCode(expectedCodes: List<Int>): AssertResult = tryCode(InCodePredicate.new(expectedCodes))
 
-    public fun <P : Predicate<Int>> tryCode(pred: IntoCodePredicate<P>): AssertResult = codeImpl(pred.intoCode())
+    public fun tryCode(pred: IntoCodePredicate): AssertResult = codeImpl(pred.intoCode())
 
     public fun codeImpl(pred: Predicate<Int>): AssertResult {
         val actualCode = output.status.code ?: return Result.failure(intoError(AssertReason.CommandInterrupted))
@@ -95,9 +96,9 @@ public class Assert(
 
     public fun stdout(expected: ByteArray): Assert = tryStdout(expected).getOrThrow()
 
-    public fun <P : Predicate<ByteArray>> stdout(pred: IntoOutputPredicate<P>): Assert = tryStdout(pred).getOrThrow()
+    public fun stdout(pred: IntoOutputPredicate): Assert = tryStdout(pred).getOrThrow()
 
-    public fun <P : Predicate<String>> stdout(pred: P): Assert = tryStdout(StrOutputPredicate.new(pred)).getOrThrow()
+    public fun stdout(pred: Predicate<String>): Assert = tryStdout(StrOutputPredicate.new(pred)).getOrThrow()
 
     public fun stdout(pred: (String) -> Boolean): Assert = stdout(Predicate { pred(it) })
 
@@ -105,7 +106,9 @@ public class Assert(
 
     public fun tryStdout(expected: ByteArray): AssertResult = tryStdout(BytesContentOutputPredicate.new(expected))
 
-    public fun <P : Predicate<ByteArray>> tryStdout(pred: IntoOutputPredicate<P>): AssertResult = stdoutImpl(pred.intoOutput())
+    public fun tryStdout(pred: IntoOutputPredicate): AssertResult = stdoutImpl(pred.intoOutput())
+
+    public fun tryStdout(pred: Predicate<String>): AssertResult = stdoutImpl(StrOutputPredicate.new(pred))
 
     public fun stdoutImpl(pred: Predicate<ByteArray>): AssertResult {
         val actual = output.stdout
@@ -121,9 +124,9 @@ public class Assert(
 
     public fun stderr(expected: ByteArray): Assert = tryStderr(expected).getOrThrow()
 
-    public fun <P : Predicate<ByteArray>> stderr(pred: IntoOutputPredicate<P>): Assert = tryStderr(pred).getOrThrow()
+    public fun stderr(pred: IntoOutputPredicate): Assert = tryStderr(pred).getOrThrow()
 
-    public fun <P : Predicate<String>> stderr(pred: P): Assert = tryStderr(StrOutputPredicate.new(pred)).getOrThrow()
+    public fun stderr(pred: Predicate<String>): Assert = tryStderr(StrOutputPredicate.new(pred)).getOrThrow()
 
     public fun stderr(pred: (String) -> Boolean): Assert = stderr(Predicate { pred(it) })
 
@@ -131,7 +134,9 @@ public class Assert(
 
     public fun tryStderr(expected: ByteArray): AssertResult = tryStderr(BytesContentOutputPredicate.new(expected))
 
-    public fun <P : Predicate<ByteArray>> tryStderr(pred: IntoOutputPredicate<P>): AssertResult = stderrImpl(pred.intoOutput())
+    public fun tryStderr(pred: IntoOutputPredicate): AssertResult = stderrImpl(pred.intoOutput())
+
+    public fun tryStderr(pred: Predicate<String>): AssertResult = stderrImpl(StrOutputPredicate.new(pred))
 
     public fun stderrImpl(pred: Predicate<ByteArray>): AssertResult {
         val actual = output.stderr
@@ -160,14 +165,14 @@ public class Assert(
     }
 }
 
-public fun <P : Predicate<Int>> convertCode(pred: IntoCodePredicate<P>): P = pred.intoCode()
+public fun convertCode(pred: IntoCodePredicate): Predicate<Int> = pred.intoCode()
 
-public fun <P : Predicate<ByteArray>> convertOutput(pred: IntoOutputPredicate<P>): P = pred.intoOutput()
+public fun convertOutput(pred: IntoOutputPredicate): Predicate<ByteArray> = pred.intoOutput()
 
 /**
  * Generic predicate interface.
  */
-public fun interface Predicate<T> {
+public fun interface Predicate<in T> {
     public fun eval(item: T): Boolean
 
     public fun findCase(expected: Boolean, variable: T): Case? =
@@ -203,14 +208,14 @@ public class CaseTree(
     override fun toString(): String = "${case.predicate}"
 }
 
-public interface IntoCodePredicate<P : Predicate<Int>> {
-    public fun intoCode(): P
+public interface IntoCodePredicate {
+    public fun intoCode(): Predicate<Int>
 }
 
 public class EqCodePredicate(
     public val expected: Int,
 ) : Predicate<Int>,
-    IntoCodePredicate<EqCodePredicate> {
+    IntoCodePredicate {
     override fun eval(item: Int): Boolean = item == expected
 
     override fun intoCode(): EqCodePredicate = this
@@ -227,7 +232,7 @@ public class EqCodePredicate(
 public class InCodePredicate(
     public val expected: List<Int>,
 ) : Predicate<Int>,
-    IntoCodePredicate<InCodePredicate> {
+    IntoCodePredicate {
     override fun eval(item: Int): Boolean = item in expected
 
     override fun intoCode(): InCodePredicate = this
@@ -241,14 +246,14 @@ public class InCodePredicate(
     }
 }
 
-public interface IntoOutputPredicate<P : Predicate<ByteArray>> {
-    public fun intoOutput(): P
+public interface IntoOutputPredicate {
+    public fun intoOutput(): Predicate<ByteArray>
 }
 
 public class BytesContentOutputPredicate(
     public val expected: ByteArray,
 ) : Predicate<ByteArray>,
-    IntoOutputPredicate<BytesContentOutputPredicate> {
+    IntoOutputPredicate {
     override fun eval(item: ByteArray): Boolean = expected.contentEquals(item)
 
     override fun intoOutput(): BytesContentOutputPredicate = this
@@ -275,7 +280,7 @@ public class BytesContentOutputPredicate(
 public class StrContentOutputPredicate(
     public val expected: String,
 ) : Predicate<ByteArray>,
-    IntoOutputPredicate<StrContentOutputPredicate> {
+    IntoOutputPredicate {
     override fun eval(item: ByteArray): Boolean = expected == item.decodeToString()
 
     override fun intoOutput(): StrContentOutputPredicate = this
@@ -299,20 +304,20 @@ public class StrContentOutputPredicate(
     }
 }
 
-public class StrOutputPredicate<P : Predicate<String>>(
-    public val predicate: P,
+public class StrOutputPredicate(
+    public val predicate: Predicate<String>,
 ) : Predicate<ByteArray>,
-    IntoOutputPredicate<StrOutputPredicate<P>> {
+    IntoOutputPredicate {
     override fun eval(item: ByteArray): Boolean = predicate.eval(item.decodeToString())
 
-    override fun intoOutput(): StrOutputPredicate<P> = this
+    override fun intoOutput(): StrOutputPredicate = this
 
     public fun fmt(): String = toString()
 
     override fun toString(): String = predicate.toString()
 
     public companion object {
-        public fun <P : Predicate<String>> new(pred: P): StrOutputPredicate<P> = StrOutputPredicate(pred)
+        public fun new(pred: Predicate<String>): StrOutputPredicate = StrOutputPredicate(pred)
     }
 }
 
@@ -321,8 +326,6 @@ public class AssertError(
     public val reason: AssertReason,
 ) : Exception(reason.formatMessage(assert)) {
     public fun panic(): Nothing = throw this
-
-    public fun assert(): Assert = assert
 
     public fun fmt(): String = message ?: ""
 
