@@ -5,9 +5,9 @@ Based on AST analysis, here are the concrete next steps.
 ## Summary
 
 - **Files Present:** 8/8 (100.0%)
-- **Function parity:** 93/95 matched (target 193) — 97.9%
-- **Class/type parity:** 27/28 matched (target 49) — 96.4%
-- **Combined symbol parity:** 120/123 matched (target 242) — 97.6%
+- **Function parity:** 93/95 matched (target 201) — 97.9%
+- **Class/type parity:** 27/28 matched (target 51) — 96.4%
+- **Combined symbol parity:** 120/123 matched (target 252) — 97.6%
 - **Average inline-code cosine:** 0.49 (function body across 8 matched files)
 - **Average documentation cosine:** 0.28 (doc text across 8 matched files)
 - **Cheat-zeroed Files:** 1
@@ -68,9 +68,9 @@ Every matched file is listed below with function and type symbol parity.
 - **Similarity:** 0.35
 - **Dependents:** 0
 - **Priority Score:** 1006.5
-- **Functions:** 7/7 matched (target 9)
+- **Functions:** 7/7 matched (target 15)
 - **Missing functions:** _none_
-- **Types:** 3/3 matched
+- **Types:** 3/3 matched (target 4)
 - **Missing types:** _none_
 
 ### 5. color
@@ -79,9 +79,9 @@ Every matched file is listed below with function and type symbol parity.
 - **Similarity:** 0.66
 - **Dependents:** 0
 - **Priority Score:** 803.4
-- **Functions:** 6/6 matched (target 9)
+- **Functions:** 6/6 matched (target 11)
 - **Missing functions:** _none_
-- **Types:** 2/2 matched
+- **Types:** 2/2 matched (target 3)
 - **Missing types:** _none_
 
 ### 6. bin.bin_fixture
