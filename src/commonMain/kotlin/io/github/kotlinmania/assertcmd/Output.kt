@@ -3,25 +3,57 @@ package io.github.kotlinmania.assertcmd
 
 /**
  * Result of an output operation.
+ *
+ * Generally produced by [OutputOkExt].
+ *
+ * Example:
+ * ```
+ * val result = Command("echo").args("42").ok()
+ * assertTrue(result.isSuccess)
+ * ```
  */
 public typealias OutputResult = Result<Output>
 
 /**
  * Converts a type to an [OutputResult].
+ *
+ * This is for example implemented on [Output] and [Command].
+ *
+ * Example:
+ * ```
+ * val result = Command("echo").args("42").ok()
+ * assertTrue(result.isSuccess)
+ * ```
  */
 public interface OutputOkExt {
     /**
      * Convert an [Output] to an [OutputResult].
+     *
+     * Example:
+     * ```
+     * val result = Command("echo").args("42").ok()
+     * assertTrue(result.isSuccess)
+     * ```
      */
     public fun ok(): OutputResult
 
     /**
      * Unwrap an [Output] with a detailed diagnostic error if unsuccessful.
+     *
+     * Example:
+     * ```
+     * val output = Command("echo").args("42").unwrap()
+     * ```
      */
     public fun unwrap(): Output
 
     /**
      * Unwrap an [Output] expecting failure, or throw with standard output diagnostics.
+     *
+     * Example:
+     * ```
+     * val err = Command("a-command").args("--will-fail").unwrapErr()
+     * ```
      */
     public fun unwrapErr(): OutputError
 }
@@ -30,7 +62,13 @@ public interface OutputOkExt {
  * Exit status of a process.
  */
 public data class ExitStatus(
+    /**
+     * The exit status code, if any.
+     */
     public val code: Int? = null,
+    /**
+     * Whether the process exited successfully (code 0).
+     */
     public val success: Boolean = code == 0,
 )
 
@@ -38,8 +76,11 @@ public data class ExitStatus(
  * Process output representation.
  */
 public data class Output(
+    /** The status (exit code) of the process. */
     public val status: ExitStatus,
+    /** The data that the process wrote to stdout. */
     public val stdout: ByteArray = ByteArray(0),
+    /** The data that the process wrote to stderr. */
     public val stderr: ByteArray = ByteArray(0),
 ) : OutputOkExt {
     override fun ok(): OutputResult =
@@ -75,6 +116,9 @@ public data class Output(
         return result
     }
 
+    /**
+     * Formats the output as a string.
+     */
     public fun fmt(): String =
         buildString {
             outputFmt(this@Output, this)
@@ -85,40 +129,53 @@ public data class Output(
 
 /**
  * Detailed error produced by command execution or assertion failure.
+ *
+ * Example:
+ * ```
+ * val err = Command("a-command").args("--will-fail").unwrapErr()
+ * ```
  */
 public class OutputError internal constructor(
     private var cmd: String? = null,
     private var stdin: ByteArray? = null,
     private var errorCause: OutputCause,
 ) : Exception((errorCause as? OutputCause.Unexpected)?.throwable) {
+    /** Formats the error as a string message. */
     public fun fmt(): String = message
+
+    /** Convert [Output] into an [OutputError]. */
     public constructor(output: Output) : this(
         cmd = null,
         stdin = null,
         errorCause = OutputCause.Expected(output),
     )
 
+    /** For errors that happen in creating an [Output]. */
     public constructor(cause: Throwable) : this(
         cmd = null,
         stdin = null,
         errorCause = OutputCause.Unexpected(cause),
     )
 
+    /** Attach a cause throwable to this error. */
     public fun withCause(cause: Throwable): OutputError {
         this.errorCause = OutputCause.Unexpected(cause)
         return this
     }
 
+    /** Add the command line for additional context. */
     public fun setCmd(cmd: String): OutputError {
         this.cmd = cmd
         return this
     }
 
+    /** Add the stdin content for additional context. */
     public fun setStdin(stdin: ByteArray): OutputError {
         this.stdin = stdin.copyOf()
         return this
     }
 
+    /** Access the contained [Output] if present. */
     public fun asOutput(): Output? =
         when (val cause = errorCause) {
             is OutputCause.Expected -> cause.output
@@ -145,8 +202,10 @@ public class OutputError internal constructor(
     override fun toString(): String = message
 
     public companion object {
+        /** Create an [OutputError] from an [Output]. */
         public fun new(output: Output): OutputError = OutputError(output)
 
+        /** Create an [OutputError] with a cause. */
         public fun withCause(cause: Throwable): OutputError = OutputError(cause)
     }
 }

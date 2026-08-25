@@ -9,7 +9,7 @@ Based on AST analysis, here are the concrete next steps.
 - **Class/type parity:** 27/28 matched (target 51) — 96.4%
 - **Combined symbol parity:** 120/123 matched (target 254) — 97.6%
 - **Average inline-code cosine:** 0.49 (function body across 8 matched files)
-- **Average documentation cosine:** 0.28 (doc text across 8 matched files)
+- **Average documentation cosine:** 0.41 (doc text across 8 matched files)
 - **Cheat-zeroed Files:** 1
 - **Critical Issues:** 6 files with <0.60 function similarity
 
@@ -87,14 +87,13 @@ Every matched file is listed below with function and type symbol parity.
 ### 6. bin.bin_fixture
 
 - **Target:** `bin.BinFixture`
-- **Similarity:** 0.51
+- **Similarity:** 0.55
 - **Dependents:** 0
-- **Priority Score:** 204.9
+- **Priority Score:** 204.5
 - **Functions:** 2/2 matched
 - **Missing functions:** _none_
 - **Types:** 0/0 matched (target 1)
 - **Missing types:** _none_
-- **Lint issues:** 1
 
 ### 7. lib
 

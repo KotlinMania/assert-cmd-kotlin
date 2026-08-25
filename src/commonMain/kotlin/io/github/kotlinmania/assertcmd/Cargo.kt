@@ -3,6 +3,12 @@ package io.github.kotlinmania.assertcmd
 
 /**
  * Extension trait for [Command] to easily launch a crate's binaries.
+ *
+ * Example:
+ * ```
+ * val cmd = Command.cargoBin("binFixture").getOrThrow()
+ * val output = cmd.unwrap()
+ * ```
  */
 public interface CommandCargoExt {
     /**
@@ -21,9 +27,15 @@ public class CargoError(
     override val cause: Throwable? = null,
 ) : Exception(cause?.message, cause) {
     public companion object {
+        /**
+         * Wrap the underlying error for passing up.
+         */
         public fun withCause(cause: Throwable): CargoError = CargoError(cause)
     }
 
+    /**
+     * Format the error as a string.
+     */
     public fun fmt(): String = toString()
 
     override fun toString(): String =
@@ -51,9 +63,11 @@ public fun cargoBin(name: String): String = cargoBinStr(name)
 
 internal fun cargoBinStr(name: String): String = name
 
-@Suppress("DEPRECATION")
+/**
+ * Create a [Command] to run a specific binary fixture or executable.
+ */
 public fun cargoBinCmd(name: String): Result<Command> {
-    val path = cargoBin(name)
+    val path = cargoBinStr(name)
     val runner = cargoRunner()
     return if (runner != null && runner.isNotEmpty()) {
         val cmd = Command.new(runner[0])
@@ -65,4 +79,8 @@ public fun cargoBinCmd(name: String): Result<Command> {
     }
 }
 
+/**
+ * Runner binary and arguments if configured for the current target platform.
+ */
 public fun cargoRunner(): List<String>? = null
+

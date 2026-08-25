@@ -18,11 +18,11 @@ public fun crateName(): String = pkgName()
 /**
  * The path to a binary target's executable.
  */
-@Suppress("DEPRECATION")
-public fun cargoBinMacro(binTargetName: String = pkgName()): String = cargoBin(binTargetName)
+public fun cargoBinMacro(binTargetName: String = pkgName()): String = cargoBinStr(binTargetName)
 
 /**
  * A [Command] for the binary target's executable.
  */
 public fun cargoBinCmdMacro(binTargetName: String = pkgName()): Command =
     cargoBinCmd(binTargetName).getOrThrow()
+
