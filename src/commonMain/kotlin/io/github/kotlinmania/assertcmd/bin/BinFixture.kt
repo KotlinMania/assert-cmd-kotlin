@@ -13,7 +13,7 @@ public object BinFixture {
         return code
     }
 
-    public fun main(args: Array<String>) {
+    public fun main() {
         val code = run()
         if (code != 0) {
             // non-zero exit simulation
