@@ -725,4 +725,3 @@ public sealed class AssertReason {
             append(assert.toString())
         }
 }
-

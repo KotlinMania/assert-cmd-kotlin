@@ -27,8 +27,10 @@ public object Lib {
 public object Prelude {
     /** Re-export of [OutputAssertExt]. */
     public typealias OutputAssertExt = io.github.kotlinmania.assertcmd.OutputAssertExt
+
     /** Re-export of [CommandCargoExt]. */
     public typealias CommandCargoExt = io.github.kotlinmania.assertcmd.CommandCargoExt
+
     /** Re-export of [OutputOkExt]. */
     public typealias OutputOkExt = io.github.kotlinmania.assertcmd.OutputOkExt
 }
@@ -37,4 +39,3 @@ public object Prelude {
  * Type representing README doctest presence.
  */
 public class ReadmeDoctests
-
