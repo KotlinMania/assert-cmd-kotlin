@@ -1,4 +1,4 @@
-// port-lint: tests assert_cmd/src/assert.rs
+// port-lint: tests assert.rs
 package io.github.kotlinmania.assertcmd
 
 import kotlin.test.Test

@@ -1,4 +1,4 @@
-// port-lint: source assert_cmd/src/macros.rs
+// port-lint: source macros.rs
 package io.github.kotlinmania.assertcmd
 
 /**
