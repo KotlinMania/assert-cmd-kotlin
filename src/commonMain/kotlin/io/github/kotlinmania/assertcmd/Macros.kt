@@ -25,4 +25,3 @@ public fun cargoBinMacro(binTargetName: String = pkgName()): String = cargoBinSt
  */
 public fun cargoBinCmdMacro(binTargetName: String = pkgName()): Command =
     cargoBinCmd(binTargetName).getOrThrow()
-
