@@ -1,4 +1,4 @@
-// port-lint: source cmd.rs
+// port-lint: source assert_cmd/src/cmd.rs
 package io.github.kotlinmania.assertcmd
 
 import kotlin.time.Duration
