@@ -4,14 +4,14 @@ Based on AST analysis, here are the concrete next steps.
 
 ## Summary
 
-- **Files Present:** 8/8 (100.0%)
-- **Function parity:** 93/95 matched (target 199) — 97.9%
+- **Files Present:** 8/11 (72.7%)
+- **Function parity:** 93/99 matched (target 199) — 93.9%
 - **Class/type parity:** 27/28 matched (target 51) — 96.4%
-- **Combined symbol parity:** 120/123 matched (target 250) — 97.6%
-- **Average inline-code cosine:** 0.49 (function body across 8 matched files)
-- **Average documentation cosine:** 0.41 (doc text across 8 matched files)
-- **Cheat-zeroed Files:** 0
-- **Critical Issues:** 6 files with <0.60 function similarity
+- **Combined symbol parity:** 120/127 matched (target 250) — 94.5%
+- **Average inline-code cosine:** 0.42 (function body across 7 matched files)
+- **Average documentation cosine:** 0.39 (doc text across 7 matched files)
+- **Cheat-zeroed Files:** 1
+- **Critical Issues:** 7 files with <0.60 function similarity
 
 ## Priority 1: Fix Incomplete High-Dependency Files
 
@@ -27,7 +27,7 @@ No missing high-value files detected.
 
 Every matched file is listed below with function and type symbol parity.
 
-### 1. assert
+### 1. assert_cmd.assert
 
 - **Target:** `assertcmd.Assert`
 - **Similarity:** 0.50
@@ -39,7 +39,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing types:** `Predicate`
 - **Tests:** 8/10 matched
 
-### 2. cmd
+### 2. assert_cmd.cmd
 
 - **Target:** `assertcmd.Cmd`
 - **Similarity:** 0.41
@@ -50,7 +50,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 1/1 matched (target 2)
 - **Missing types:** _none_
 
-### 3. output
+### 3. assert_cmd.output
 
 - **Target:** `assertcmd.Output`
 - **Similarity:** 0.47
@@ -62,7 +62,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing types:** _none_
 - **Tests:** 1/1 matched
 
-### 4. cargo
+### 4. assert_cmd.cargo
 
 - **Target:** `assertcmd.Cargo`
 - **Similarity:** 0.35
@@ -73,7 +73,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 3/3 matched (target 4)
 - **Missing types:** _none_
 
-### 5. color
+### 5. assert_cmd.color
 
 - **Target:** `assertcmd.Color`
 - **Similarity:** 0.66
@@ -95,12 +95,12 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 0/0 matched (target 1)
 - **Missing types:** _none_
 
-### 7. lib
+### 7. assert_cmd.lib
 
-- **Target:** `assertcmd.Lib`
-- **Similarity:** 1.00
+- **Target:** `assertcmd.Lib [STUB]`
+- **Similarity:** 0.00
 - **Dependents:** 0
-- **Priority Score:** 100.0
+- **Priority Score:** 110.0
 - **Functions:** 0/0 matched
 - **Missing functions:** _none_
 - **Types:** 1/1 matched (target 6)
@@ -126,5 +126,5 @@ do not treat them as the next implementation target by default.
 
 | Source | Target | Path |
 |--------|--------|------|
-| `macros` | `assertcmd.Macros` | `macros` |
+| `assert_cmd.macros` | `assertcmd.Macros` | `assert_cmd/src/macros` |
 
