@@ -1,4 +1,4 @@
-// port-lint: source assert_cmd/src/bin/bin_fixture.rs
+// port-lint: source bin/bin_fixture.rs
 package io.github.kotlinmania.assertcmd.bin
 
 public object BinFixture {

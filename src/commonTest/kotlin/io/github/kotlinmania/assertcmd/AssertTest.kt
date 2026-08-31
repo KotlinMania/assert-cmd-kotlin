@@ -1,4 +1,4 @@
-// port-lint: tests assert_cmd/src/assert.rs
+// port-lint: tests assert.rs
 package io.github.kotlinmania.assertcmd
 
 import kotlin.test.Test
@@ -101,9 +101,9 @@ class AssertTest {
         output.assert().stdout { it.contains("world") }
     }
 
-    private fun convertCode(pred: IntoCodePredicate): Predicate<Int> = pred.intoCode()
+    fun convertCode(pred: IntoCodePredicate): Predicate<Int> = pred.intoCode()
 
-    private fun convertOutput(pred: IntoOutputPredicate): Predicate<ByteArray> = pred.intoOutput()
+    fun convertOutput(pred: IntoOutputPredicate): Predicate<ByteArray> = pred.intoOutput()
 
     @Test
     fun intoCodeFromPred() {
