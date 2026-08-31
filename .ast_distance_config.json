@@ -3,7 +3,7 @@
   "parity_mode": false,
   "name": "assert-cmd-kotlin",
   "source": {
-    "path": "tmp/assert_cmd/src",
+    "path": "tmp",
     "lang": "rust"
   },
   "target": {
