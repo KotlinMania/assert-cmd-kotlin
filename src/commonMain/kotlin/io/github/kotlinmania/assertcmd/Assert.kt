@@ -1,4 +1,4 @@
-// port-lint: source assert_cmd/src/assert.rs
+// port-lint: source assert.rs
 package io.github.kotlinmania.assertcmd
 
 /**

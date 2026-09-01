@@ -3,7 +3,7 @@
   "parity_mode": false,
   "name": "assert-cmd-kotlin",
   "source": {
-    "path": "tmp",
+    "path": "tmp/assert_cmd/src",
     "lang": "rust"
   },
   "target": {
@@ -16,5 +16,5 @@
     "todos": true,
     "lint": true
   },
-  "reexport_modules": ["macros"]
+  "reexport_modules": ["lib.rs", "lib", "macros.rs", "macros"]
 }
