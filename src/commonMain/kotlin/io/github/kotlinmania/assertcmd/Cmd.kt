@@ -276,7 +276,7 @@ public class Command(
             }
         }
 
-    public companion object {
+    public companion object : CommandCargoExt {
         /**
          * Constructs a new Command for the given program.
          */
@@ -295,6 +295,9 @@ public class Command(
         /**
          * Create a Command to run a specific binary fixture or executable.
          */
-        public fun cargoBin(name: String): Result<Command> = cargoBinCmd(name)
+        @Deprecated(
+            message = "incompatible with a custom cargo build-dir, see instead cargo_bin!",
+        )
+        override fun cargoBin(name: String): Result<Command> = cargoBinCmd(name)
     }
 }

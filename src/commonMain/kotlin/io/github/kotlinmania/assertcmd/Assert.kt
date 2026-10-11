@@ -24,11 +24,6 @@ public interface OutputAssertExt {
 }
 
 /**
- * Extension to wrap [Output] in an [Assert] assertion interface.
- */
-public fun Output.assert(): Assert = Assert.new(this)
-
-/**
  * [Assert] represented as a [Result].
  *
  * Produced by the `try*` variants of the [Assert] methods.
@@ -473,6 +468,13 @@ public class EqCodePredicate(
     IntoCodePredicate {
     override fun eval(item: Int): Boolean = item == expected
 
+    override fun findCase(expected: Boolean, variable: Int): Case? =
+        if (eval(variable) == expected) Case(this, expected) else null
+
+    override fun parameters(): Iterator<Parameter> = listOf(Parameter("expected", expected)).iterator()
+
+    override fun children(): Iterator<Child> = emptyList<Child>().iterator()
+
     override fun intoCode(): EqCodePredicate = this
 
     /**
@@ -498,6 +500,13 @@ public class InCodePredicate(
 ) : Predicate<Int>,
     IntoCodePredicate {
     override fun eval(item: Int): Boolean = item in expected
+
+    override fun findCase(expected: Boolean, variable: Int): Case? =
+        if (eval(variable) == expected) Case(this, expected) else null
+
+    override fun parameters(): Iterator<Parameter> = listOf(Parameter("expected", expected)).iterator()
+
+    override fun children(): Iterator<Child> = emptyList<Child>().iterator()
 
     override fun intoCode(): InCodePredicate = this
 
@@ -534,6 +543,13 @@ public class BytesContentOutputPredicate(
 ) : Predicate<ByteArray>,
     IntoOutputPredicate {
     override fun eval(item: ByteArray): Boolean = expected.contentEquals(item)
+
+    override fun findCase(expected: Boolean, variable: ByteArray): Case? =
+        if (eval(variable) == expected) Case(this, expected) else null
+
+    override fun parameters(): Iterator<Parameter> = listOf(Parameter("expected", expected)).iterator()
+
+    override fun children(): Iterator<Child> = emptyList<Child>().iterator()
 
     override fun intoOutput(): BytesContentOutputPredicate = this
 
@@ -574,6 +590,13 @@ public class StrContentOutputPredicate(
     IntoOutputPredicate {
     override fun eval(item: ByteArray): Boolean = expected == item.decodeToString()
 
+    override fun findCase(expected: Boolean, variable: ByteArray): Case? =
+        if (eval(variable) == expected) Case(this, expected) else null
+
+    override fun parameters(): Iterator<Parameter> = listOf(Parameter("expected", expected)).iterator()
+
+    override fun children(): Iterator<Child> = emptyList<Child>().iterator()
+
     override fun intoOutput(): StrContentOutputPredicate = this
 
     /**
@@ -613,6 +636,13 @@ public class StrOutputPredicate(
     IntoOutputPredicate {
     override fun eval(item: ByteArray): Boolean = predicate.eval(item.decodeToString())
 
+    override fun findCase(expected: Boolean, variable: ByteArray): Case? =
+        if (eval(variable) == expected) Case(this, expected) else null
+
+    override fun parameters(): Iterator<Parameter> = listOf(Parameter("predicate", predicate)).iterator()
+
+    override fun children(): Iterator<Child> = listOf(Child("predicate", predicate)).iterator()
+
     override fun intoOutput(): StrOutputPredicate = this
 
     /**
@@ -634,9 +664,14 @@ public class StrOutputPredicate(
  * Error produced by assertion failures (see [AssertResult]).
  */
 public class AssertError(
-    public val assert: Assert,
+    internal val assertValue: Assert,
     public val reason: AssertReason,
-) : Exception(reason.formatMessage(assert)) {
+) : Exception(reason.formatMessage(assertValue)) {
+    /**
+     * Returns the [Assert] wrapped into this error.
+     */
+    public fun assert(): Assert = assertValue
+
     /**
      * Panic / throw this assertion failure exception.
      */

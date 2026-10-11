@@ -153,4 +153,43 @@ class AssertTest {
         val pred = convertOutput(StrContentOutputPredicate.fromString("Hello"))
         assertTrue(pred.eval("Hello".encodeToByteArray()))
     }
+
+    @Test
+    fun testAssertErrorAssertMethod() {
+        val output = Output(status = ExitStatus(code = 1, success = false))
+        val err =
+            assertFailsWith<AssertError> {
+                output.assert().success()
+            }
+        assertEquals(output, err.assert().output)
+    }
+
+    @Test
+    fun testPredicateReflectionAndFindCase() {
+        val eqPred = EqCodePredicate(42)
+        assertEquals(42, eqPred.parameters().next().value)
+        assertTrue(!eqPred.children().hasNext())
+        assertTrue(eqPred.findCase(true, 42) != null)
+        assertTrue(eqPred.findCase(true, 0) == null)
+
+        val inPred = InCodePredicate(listOf(1, 2, 3))
+        assertEquals(listOf(1, 2, 3), inPred.parameters().next().value)
+        assertTrue(!inPred.children().hasNext())
+        assertTrue(inPred.findCase(true, 2) != null)
+
+        val bytesPred = BytesContentOutputPredicate("test".encodeToByteArray())
+        assertTrue(bytesPred.parameters().hasNext())
+        assertTrue(!bytesPred.children().hasNext())
+        assertTrue(bytesPred.findCase(true, "test".encodeToByteArray()) != null)
+
+        val strPred = StrContentOutputPredicate("test")
+        assertTrue(strPred.parameters().hasNext())
+        assertTrue(!strPred.children().hasNext())
+        assertTrue(strPred.findCase(true, "test".encodeToByteArray()) != null)
+
+        val strOutPred = StrOutputPredicate { it.startsWith("te") }
+        assertTrue(strOutPred.parameters().hasNext())
+        assertTrue(strOutPred.children().hasNext())
+        assertTrue(strOutPred.findCase(true, "test".encodeToByteArray()) != null)
+    }
 }

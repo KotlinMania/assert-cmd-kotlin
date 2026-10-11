@@ -82,7 +82,10 @@ public data class Output(
     public val stdout: ByteArray = ByteArray(0),
     /** The data that the process wrote to stderr. */
     public val stderr: ByteArray = ByteArray(0),
-) : OutputOkExt {
+) : OutputOkExt,
+    OutputAssertExt {
+    override fun assert(): Assert = Assert.new(this)
+
     override fun ok(): OutputResult =
         if (status.success) {
             Result.success(this)
