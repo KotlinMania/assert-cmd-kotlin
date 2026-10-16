@@ -231,7 +231,7 @@ public class Command(
         val res = ok()
         if (res.isSuccess) {
             val out = res.getOrThrow()
-            val stdinStr = stdinBuffer?.let { "\nstdin=```${DebugBytes(it)}```" } ?: ""
+            val stdinStr = stdinBuffer?.let { "\nstdin=```${DebugBytes(it)}```" }.orEmpty()
             error(
                 "Completed successfully:\ncommand=`$this`$stdinStr\nstdout=```${DebugBytes(out.stdout)}```",
             )
@@ -248,8 +248,9 @@ public class Command(
                 error("Failed to spawn $this: $it")
             }
         val assertion = Assert.new(out).appendContext("command", toString())
-        return if (stdinBuffer != null) {
-            assertion.appendContext("stdin", DebugBuffer(stdinBuffer!!))
+        val stdin = stdinBuffer
+        return if (stdin != null) {
+            assertion.appendContext("stdin", DebugBuffer(stdin))
         } else {
             assertion
         }
