@@ -48,7 +48,7 @@ public class CargoError(
 internal class NotFoundError(
     val path: String,
 ) : Exception("Cargo command not found: $path\n") {
-    internal fun fmt(): String = message ?: ""
+    internal fun fmt(): String = message.orEmpty()
 }
 
 internal fun targetDir(): String = "target"

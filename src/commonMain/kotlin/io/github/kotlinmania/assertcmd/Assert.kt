@@ -680,7 +680,7 @@ public class AssertError(
     /**
      * Format this error as a string.
      */
-    public fun fmt(): String = message ?: ""
+    public fun fmt(): String = message.orEmpty()
 
     public companion object {
         /**
@@ -750,12 +750,30 @@ public sealed class AssertReason {
                     appendLine("code=${actualCode ?: "<interrupted>"}")
                     appendLine("stderr=```${DebugBytes(assert.output.stderr)}```")
                 }
-                is UnexpectedSuccess -> appendLine("Unexpected success")
-                is UnexpectedCompletion -> appendLine("Unexpected completion")
-                is CommandInterrupted -> appendLine("Command interrupted")
-                is UnexpectedReturnCode -> appendLine("Unexpected return code, failed $caseTree")
-                is UnexpectedStdout -> appendLine("Unexpected stdout, failed $caseTree")
-                is UnexpectedStderr -> appendLine("Unexpected stderr, failed $caseTree")
+
+                is UnexpectedSuccess -> {
+                    appendLine("Unexpected success")
+                }
+
+                is UnexpectedCompletion -> {
+                    appendLine("Unexpected completion")
+                }
+
+                is CommandInterrupted -> {
+                    appendLine("Command interrupted")
+                }
+
+                is UnexpectedReturnCode -> {
+                    appendLine("Unexpected return code, failed $caseTree")
+                }
+
+                is UnexpectedStdout -> {
+                    appendLine("Unexpected stdout, failed $caseTree")
+                }
+
+                is UnexpectedStderr -> {
+                    appendLine("Unexpected stderr, failed $caseTree")
+                }
             }
             append(assert.toString())
         }

@@ -189,11 +189,13 @@ public class OutputError internal constructor(
         get() {
             val palette = Palette.color()
             return buildString {
-                if (cmd != null) {
-                    appendLine("${palette.key("command").renderStyled()}=${palette.value(cmd!!).renderStyled()}")
+                val command = cmd
+                if (command != null) {
+                    appendLine("${palette.key("command").renderStyled()}=${palette.value(command).renderStyled()}")
                 }
-                if (stdin != null) {
-                    appendLine("${palette.key("stdin").renderStyled()}=${palette.value(DebugBytes(stdin!!)).renderStyled()}")
+                val stdinBytes = stdin
+                if (stdinBytes != null) {
+                    appendLine("${palette.key("stdin").renderStyled()}=${palette.value(DebugBytes(stdinBytes)).renderStyled()}")
                 }
                 when (val cause = errorCause) {
                     is OutputCause.Expected -> outputFmt(cause.output, this)
@@ -339,12 +341,30 @@ private fun escapeBstr(bytes: ByteArray): String {
     val sb = StringBuilder()
     for (b in bytes) {
         when (val c = (b.toInt() and 0xFF).toChar()) {
-            '\\' -> sb.append("\\\\")
-            '"' -> sb.append("\\\"")
-            '\t' -> sb.append("\\t")
-            '\r' -> sb.append("\\r")
-            '\n' -> sb.append("\\n")
-            in ' '..'~' -> sb.append(c)
+            '\\' -> {
+                sb.append("\\\\")
+            }
+
+            '"' -> {
+                sb.append("\\\"")
+            }
+
+            '\t' -> {
+                sb.append("\\t")
+            }
+
+            '\r' -> {
+                sb.append("\\r")
+            }
+
+            '\n' -> {
+                sb.append("\\n")
+            }
+
+            in ' '..'~' -> {
+                sb.append(c)
+            }
+
             else -> {
                 val hex = (b.toInt() and 0xFF).toString(16).padStart(2, '0')
                 sb.append("\\x$hex")
