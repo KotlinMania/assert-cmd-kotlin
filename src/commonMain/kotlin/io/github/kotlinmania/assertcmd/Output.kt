@@ -131,11 +131,13 @@ public data class Output(
 }
 
 /**
- * Detailed error produced by command execution or assertion failure.
+ * Command error.
+ *
+ * Generally produced by [OutputOkExt].
  *
  * Example:
- * ```
- * val err = Command("a-command").args("--will-fail").unwrapErr()
+ * ```kotlin
+ * val err = Command.new("a-command").args(listOf("--will-fail")).unwrapErr()
  * ```
  */
 public class OutputError internal constructor(
@@ -146,39 +148,58 @@ public class OutputError internal constructor(
     /** Formats the error as a string message. */
     public fun fmt(): String = message
 
-    /** Convert [Output] into an [OutputError]. */
+    /**
+     * Convert [Output] into an [OutputError].
+     */
     public constructor(output: Output) : this(
         cmd = null,
         stdin = null,
         errorCause = OutputCause.Expected(output),
     )
 
-    /** For errors that happen in creating an [Output]. */
+    /**
+     * For errors that happen in creating an [Output].
+     */
     public constructor(cause: Throwable) : this(
         cmd = null,
         stdin = null,
         errorCause = OutputCause.Unexpected(cause),
     )
 
-    /** Attach a cause throwable to this error. */
+    /**
+     * Attach a cause throwable to this error.
+     */
     public fun withCause(cause: Throwable): OutputError {
         this.errorCause = OutputCause.Unexpected(cause)
         return this
     }
 
-    /** Add the command line for additional context. */
+    /**
+     * Add the command line for additional context.
+     */
     public fun setCmd(cmd: String): OutputError {
         this.cmd = cmd
         return this
     }
 
-    /** Add the stdin content for additional context. */
+    /**
+     * Add the stdin content for additional context.
+     */
     public fun setStdin(stdin: ByteArray): OutputError {
         this.stdin = stdin.copyOf()
         return this
     }
 
-    /** Access the contained [Output] if present. */
+    /**
+     * Access the contained [Output] if present.
+     *
+     * Example:
+     * ```kotlin
+     * val err = Command.new("a-command").args(listOf("--will-fail")).unwrapErr()
+     * val output = err.asOutput()
+     * assertEquals(42, output?.status?.code)
+     * ```
+     */
     public fun asOutput(): Output? =
         when (val cause = errorCause) {
             is OutputCause.Expected -> cause.output

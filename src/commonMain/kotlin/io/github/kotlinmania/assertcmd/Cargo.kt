@@ -2,17 +2,34 @@
 package io.github.kotlinmania.assertcmd
 
 /**
- * Extension trait for [Command] to easily launch a crate's binaries.
+ * Simplify running binaries in a project.
  *
- * Example:
- * ```
+ * [CommandCargoExt] is an extension interface for [Command] to easily launch a project's
+ * binaries.
+ *
+ * Examples:
+ *
+ * Simple case:
+ *
+ * ```kotlin
  * val cmd = Command.cargoBin("binFixture").getOrThrow()
  * val output = cmd.unwrap()
  * ```
  */
 public interface CommandCargoExt {
     /**
-     * Create a [Command] to run a specific binary of the current crate.
+     * Create a [Command] to run a specific binary of the current project.
+     *
+     * The [Command] created with this method may run the binary through a runner, as configured
+     * in the target runner environment. This is useful for running
+     * binaries that cannot be launched directly, such as cross-compiled binaries.
+     *
+     * Example:
+     *
+     * ```kotlin
+     * val cmd = Command.cargoBin("binFixture").getOrThrow()
+     * val output = cmd.unwrap()
+     * ```
      */
     @Deprecated(
         message = "incompatible with a custom cargo build-dir, see instead cargo_bin!",
@@ -51,16 +68,22 @@ internal class NotFoundError(
     internal fun fmt(): String = message.orEmpty()
 }
 
+/**
+ * Path to build target directory.
+ */
 internal fun targetDir(): String = "target"
 
 /**
- * Look up the path to a cargo-built binary within an integration test.
+ * Look up the path to a built binary within an integration test.
  */
 @Deprecated(
     message = "incompatible with a custom cargo build-dir, see instead cargo_bin!",
 )
 public fun cargoBin(name: String): String = cargoBinStr(name)
 
+/**
+ * Resolve the binary executable string path for the given binary name.
+ */
 internal fun cargoBinStr(name: String): String = name
 
 /**
@@ -83,3 +106,8 @@ public fun cargoBinCmd(name: String): Result<Command> {
  * Runner binary and arguments if configured for the current target platform.
  */
 public fun cargoRunner(): List<String>? = null
+
+/**
+ * The current process' target triplet.
+ */
+internal const val CURRENT_TARGET: String = "unknown-unknown-unknown"

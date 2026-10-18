@@ -4,14 +4,14 @@ Based on AST analysis, here are the concrete next steps.
 
 ## Summary
 
-- **Files Present:** 7/8 (87.5%)
+- **Files Present:** 6/8 (75.0%)
 - **Function parity:** 93/95 matched (target 217) — 97.9%
 - **Class/type parity:** 26/27 matched (target 45) — 96.3%
 - **Combined symbol parity:** 119/122 matched (target 262) — 97.5%
-- **Average inline-code cosine:** 0.43 (function body across 7 matched files)
-- **Average documentation cosine:** 0.39 (doc text across 7 matched files)
+- **Average inline-code cosine:** 0.50 (function body across 6 matched files)
+- **Average documentation cosine:** 0.41 (doc text across 6 matched files)
 - **Cheat-zeroed Files:** 0
-- **Critical Issues:** 6 files with <0.60 function similarity
+- **Critical Issues:** 5 files with <0.60 function similarity
 
 ## Priority 1: Fix Incomplete High-Dependency Files
 
@@ -111,15 +111,10 @@ normal priority and missing-file ladders because they are wiring
 modules, not direct logic ports. Consult them for call-site routing;
 do not treat them as the next implementation target by default.
 
-### Matched
-
-| Source | Target | Path |
-|--------|--------|------|
-| `macros` | `assertcmd.Macros` | `macros` |
-
 ### Missing
 
 | Source | Expected target | Deps | Source path | Expected path |
 |--------|-----------------|------|-------------|---------------|
 | `lib` | `Lib` | 0 | `lib.rs` | `Lib.kt` |
+| `macros` | `Macros` | 0 | `macros.rs` | `Macros.kt` |
 

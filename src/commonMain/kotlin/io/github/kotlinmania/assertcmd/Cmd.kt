@@ -59,6 +59,15 @@ public class Command(
 
     /**
      * Error out if a timeout is reached.
+     *
+     * Example:
+     * ```kotlin
+     * val assert = Command.cargoBin("binFixture").getOrThrow()
+     *     .timeout(1.toDuration(DurationUnit.SECONDS))
+     *     .env("sleep", "100")
+     *     .assert()
+     * assert.failure()
+     * ```
      */
     public fun timeout(timeout: Duration): Command {
         this.timeoutDuration = timeout
@@ -66,17 +75,27 @@ public class Command(
     }
 
     /**
-     * Pipe content to stdin.
+     * Pipe content to stdin when the Command is run.
      */
     public fun pipeStdin(content: ByteArray): Command = writeStdin(content)
 
     /**
-     * Pipe string file content to stdin.
+     * Pipe string file content to stdin when the Command is run.
      */
     public fun pipeStdin(fileContent: String): Command = writeStdin(fileContent)
 
     /**
      * Adds an argument to pass to the program.
+     *
+     * Only one argument can be passed per use. To pass multiple arguments see [args].
+     *
+     * Example:
+     * ```kotlin
+     * Command.new("ls")
+     *     .arg("-l")
+     *     .arg("-a")
+     *     .unwrap()
+     * ```
      */
     public fun arg(arg: String): Command {
         argsList.add(arg)
@@ -85,6 +104,15 @@ public class Command(
 
     /**
      * Adds multiple arguments to pass to the program.
+     *
+     * To pass a single argument see [arg].
+     *
+     * Example:
+     * ```kotlin
+     * Command.new("ls")
+     *     .args(listOf("-l", "-a"))
+     *     .unwrap()
+     * ```
      */
     public fun args(args: Iterable<String>): Command {
         for (a in args) {
@@ -105,6 +133,13 @@ public class Command(
 
     /**
      * Inserts or updates an explicit environment variable mapping.
+     *
+     * Example:
+     * ```kotlin
+     * Command.new("ls")
+     *     .env("PATH", "/bin")
+     *     .unwrapErr()
+     * ```
      */
     public fun env(key: String, value: String): Command {
         envMap[key] = value
@@ -113,6 +148,14 @@ public class Command(
 
     /**
      * Inserts or updates multiple explicit environment variable mappings.
+     *
+     * Example:
+     * ```kotlin
+     * Command.new("printenv")
+     *     .envClear()
+     *     .envs(listOf("TERM" to "dumb"))
+     *     .unwrap()
+     * ```
      */
     public fun envs(vars: Iterable<Pair<String, String>>): Command {
         for ((k, v) in vars) {
@@ -131,6 +174,13 @@ public class Command(
 
     /**
      * Removes an environment variable mapping.
+     *
+     * Example:
+     * ```kotlin
+     * Command.new("ls")
+     *     .envRemove("PATH")
+     *     .unwrapErr()
+     * ```
      */
     public fun envRemove(key: String): Command {
         envMap[key] = null
@@ -139,6 +189,13 @@ public class Command(
 
     /**
      * Clears the entire environment map for the child process.
+     *
+     * Example:
+     * ```kotlin
+     * Command.new("ls")
+     *     .envClear()
+     *     .unwrapErr()
+     * ```
      */
     public fun envClear(): Command {
         envMap.clear()
@@ -147,6 +204,13 @@ public class Command(
 
     /**
      * Sets the working directory for the child process.
+     *
+     * Example:
+     * ```kotlin
+     * Command.new("ls")
+     *     .currentDir("/bin")
+     *     .unwrap()
+     * ```
      */
     public fun currentDir(dir: String): Command {
         this.currentDirectory = dir
@@ -154,22 +218,64 @@ public class Command(
     }
 
     /**
-     * Returns the program name.
+     * Returns the path to the program that was given to [Command.new].
+     *
+     * Example:
+     * ```kotlin
+     * val cmd = Command.new("echo")
+     * assertEquals("echo", cmd.getProgram())
+     * ```
      */
     public fun getProgram(): String = program
 
     /**
-     * Returns the configured argument list.
+     * Returns an iterator or list of arguments that will be passed to the program.
+     *
+     * This does not include the path to the program as the first argument;
+     * it only includes the arguments specified with [Command.arg] and [Command.args].
+     *
+     * Example:
+     * ```kotlin
+     * val cmd = Command.new("echo")
+     * cmd.arg("first").arg("second")
+     * assertEquals(listOf("first", "second"), cmd.getArgs())
+     * ```
      */
     public fun getArgs(): List<String> = argsList.toList()
 
     /**
-     * Returns the configured environment variables.
+     * Returns the environment variables explicitly set for the child process.
+     *
+     * Environment variables explicitly set using [Command.env], [Command.envs], and
+     * [Command.envRemove] can be retrieved with this method.
+     *
+     * Note that this output does not include environment variables inherited from the parent
+     * process.
+     *
+     * Each element is a key and optional value pair. A null value
+     * indicates its key was explicitly removed via [Command.envRemove]. The associated key for
+     * the null value will no longer inherit from its parent process.
+     *
+     * Example:
+     * ```kotlin
+     * val cmd = Command.new("ls")
+     * cmd.env("TERM", "dumb").envRemove("TZ")
+     * ```
      */
     public fun getEnvs(): List<Pair<String, String?>> = envMap.map { it.key to it.value }
 
     /**
-     * Returns the configured working directory.
+     * Returns the working directory for the child process.
+     *
+     * This returns null if the working directory will not be changed.
+     *
+     * Example:
+     * ```kotlin
+     * val cmd = Command.new("ls")
+     * assertEquals(null, cmd.getCurrentDir())
+     * cmd.currentDir("/bin")
+     * assertEquals("/bin", cmd.getCurrentDir())
+     * ```
      */
     public fun getCurrentDir(): String? = currentDirectory
 
@@ -206,7 +312,15 @@ public class Command(
     }
 
     /**
-     * Wrap the command output in a Result.
+     * Run a [Command], returning an [OutputResult].
+     *
+     * Example:
+     * ```kotlin
+     * val result = Command.new("echo")
+     *     .args(listOf("42"))
+     *     .ok()
+     * assertTrue(result.isSuccess)
+     * ```
      */
     override fun ok(): OutputResult {
         val out = output().getOrElse { return Result.failure(OutputError.withCause(it)) }
@@ -220,12 +334,26 @@ public class Command(
     }
 
     /**
-     * Unwrap the command Output or throw an exception if failed.
+     * Run a [Command], unwrapping the [OutputResult].
+     *
+     * Example:
+     * ```kotlin
+     * val output = Command.new("echo")
+     *     .args(listOf("42"))
+     *     .unwrap()
+     * ```
      */
     override fun unwrap(): Output = ok().getOrThrow()
 
     /**
-     * Unwrap the OutputError or throw an exception if succeeded.
+     * Run a [Command], unwrapping the error in the [OutputResult].
+     *
+     * Example:
+     * ```kotlin
+     * val err = Command.new("a-command")
+     *     .args(listOf("--will-fail"))
+     *     .unwrapErr()
+     * ```
      */
     override fun unwrapErr(): OutputError {
         val res = ok()
@@ -240,7 +368,13 @@ public class Command(
     }
 
     /**
-     * Wrap the command output in an assertion interface.
+     * Run a [Command] and make assertions on the [Output].
+     *
+     * Example:
+     * ```kotlin
+     * val cmd = Command.cargoBin("binFixture").getOrThrow()
+     * cmd.assert().success()
+     * ```
      */
     override fun assert(): Assert {
         val out =
@@ -261,11 +395,18 @@ public class Command(
      */
     public fun spawn(): Result<Command> = Result.success(this)
 
+    /**
+     * If input, write it to child's stdin while also reading stdout and stderr,
+     * then wait on child and return its status and output.
+     */
     internal fun waitWithInputOutput(
         input: ByteArray?,
         timeout: Duration?,
     ): Result<Output> = output()
 
+    /**
+     * Read bytes from input stream into buffer.
+     */
     internal fun read(bytes: ByteArray): ByteArray = bytes
 
     override fun toString(): String =
@@ -279,22 +420,35 @@ public class Command(
 
     public companion object : CommandCargoExt {
         /**
-         * Constructs a new Command for the given program.
+         * Constructs a new [Command] for launching the program at path [program].
+         *
+         * Builder methods are provided to change defaults and configure the process.
+         *
+         * Example:
+         * ```kotlin
+         * Command.new("sh").unwrap()
+         * ```
          */
         public fun new(program: String): Command = Command(program)
 
         /**
-         * Constructs a new Command from a program name.
+         * Constructs a new [Command] from a program name or path.
          */
         public fun from(program: String): Command = fromStd(program)
 
         /**
-         * Constructs a new Command from a standard program name.
+         * Constructs a new [Command] from a standard command or program name.
          */
         public fun fromStd(program: String): Command = Command(program)
 
         /**
-         * Create a Command to run a specific binary fixture or executable.
+         * Create a [Command] to run a specific binary of the current project.
+         *
+         * Example:
+         * ```kotlin
+         * val cmd = Command.cargoBin("binFixture").getOrThrow()
+         * cmd.assert().success()
+         * ```
          */
         @Deprecated(
             message = "incompatible with a custom cargo build-dir, see instead cargo_bin!",
