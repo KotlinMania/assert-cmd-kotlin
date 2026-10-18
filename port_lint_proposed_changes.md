@@ -1,6 +1,6 @@
 # port-lint Proposed Changes
 
-**Generated:** 2026-10-11
+**Generated:** 2026-10-18
 **Source:** tmp/assert_cmd/src
 **Target:** src/commonMain/kotlin/io/github/kotlinmania/assertcmd
 
