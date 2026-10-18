@@ -6,7 +6,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-@Suppress("DEPRECATION")
 class CargoTest {
     @Test
     fun testTargetDir() {
@@ -15,7 +14,7 @@ class CargoTest {
 
     @Test
     fun testCargoBin() {
-        assertEquals("mybin", cargoBin("mybin"))
+        assertEquals("mybin", cargoBinStr("mybin"))
     }
 
     @Test
