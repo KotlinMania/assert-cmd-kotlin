@@ -1,4 +1,3 @@
-// port-lint: source lib.rs
 package io.github.kotlinmania.assertcmd
 
 /**
@@ -14,25 +13,11 @@ package io.github.kotlinmania.assertcmd
  * cmd.assert().success()
  * ```
  */
-public object Lib {
+public object AssertCmd {
     /**
      * Library version string.
      */
     public const val VERSION: String = "2.1.2"
-}
-
-/**
- * Extension traits that are useful to have available.
- */
-public object Prelude {
-    /** Re-export of [OutputAssertExt]. */
-    public typealias OutputAssertExt = io.github.kotlinmania.assertcmd.OutputAssertExt
-
-    /** Re-export of [CommandCargoExt]. */
-    public typealias CommandCargoExt = io.github.kotlinmania.assertcmd.CommandCargoExt
-
-    /** Re-export of [OutputOkExt]. */
-    public typealias OutputOkExt = io.github.kotlinmania.assertcmd.OutputOkExt
 }
 
 /**
