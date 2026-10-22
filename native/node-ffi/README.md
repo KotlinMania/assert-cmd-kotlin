@@ -11,7 +11,7 @@ targets load.
 ```
 native/node-ffi/
 ├── binding.gyp            — node-gyp build config (one target, ffi_native)
-├── package.json           — npm package (@kotlinmania/template-native-bindings)
+├── package.json           — npm package (@kotlinmania/assertcmd-native-bindings)
 ├── index.js               — loader (Release → Debug fallback)
 └── src/
     └── ffi_bindings.cpp   — module init + hello-world getpid export
@@ -51,8 +51,8 @@ If you rename the target to start with "lib" (e.g. `libpng_native`), update
 The Kotlin jsMain side declares the module as an external interface:
 
 ```kotlin
-@JsModule("@kotlinmania/template-native-bindings")
-public external interface TemplateNativeBindings {
+@JsModule("@kotlinmania/assertcmd-native-bindings")
+public external interface AssertcmdNativeBindings {
     public fun getpid(): Int
 }
 ```

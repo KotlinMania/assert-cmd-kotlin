@@ -22,6 +22,7 @@ import org.jetbrains.kotlin.gradle.targets.js.yarn.YarnRootExtension
 import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsEnvSpec
 import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootEnvSpec
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -34,7 +35,6 @@ import java.util.zip.ZipInputStream
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android.kmp)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
@@ -49,6 +49,13 @@ version = providers.gradleProperty("project.version").getOrElse("0.1.0-SNAPSHOT"
 val frameworkName = providers.gradleProperty("project.frameworkName").getOrElse("Unnamed")
 val projectNamespace = providers.gradleProperty("project.namespace").getOrElse("io.github.kotlinmania")
 val kotlinVersion = providers.gradleProperty("versions.kotlin").getOrElse("2.4.0")
+// kotlinmania:common-api-bundle:v1 begin
+val commonMainApiDependencyBundle = providers.gradleProperty("project.dependencies.commonMainApiBundle")
+    .orNull?.trim()?.takeIf { it.isNotEmpty() }?.let { bundleName ->
+        extensions.getByType(VersionCatalogsExtension::class.java).named("libs")
+            .findBundle(bundleName).orElseThrow { GradleException("Missing public API bundle '$bundleName'") }
+    }
+// kotlinmania:common-api-bundle:v1 end
 val commonMainBundleName = providers.gradleProperty("project.dependencies.commonMainBundle").get()
 val commonMainDependencyBundle =
     extensions
@@ -131,6 +138,14 @@ val benchmarkIterationTimeUnit = providers.gradleProperty("project.benchmark.ite
 val intellijCoroutinesVersion =
     providers.gradleProperty("versions.intellij.coroutines").getOrElse("1.10.2-intellij-1")
 
+val projectKonanDataDirectory =
+    providers
+        .environmentVariable("KONAN_DATA_DIR")
+        .map {
+            require(it.isNotBlank()) { "KONAN_DATA_DIR must not be blank" }
+            File(it).absoluteFile
+        }.orElse(providers.systemProperty("user.home").map { File(it, ".konan") })
+
 // KGP runs Swift Export in an isolated worker whose classpath is
 // `swiftExportClasspath`. Adding a dependency disables KGP's default
 // dependency population, so keep the default embeddable runner explicit too.
@@ -158,6 +173,16 @@ configurations.configureEach {
 val browserTestExcludes =
     providers
         .gradleProperty("project.js.browserTestExcludes")
+        .getOrElse("")
+        .split(',')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+
+// Extra Kotlin compiler arguments for this repo, from
+// project.kotlin.freeCompilerArgs as a comma-separated list (empty by default).
+val extraKotlinCompilerArgs =
+    providers
+        .gradleProperty("project.kotlin.freeCompilerArgs")
         .getOrElse("")
         .split(',')
         .map { it.trim() }
@@ -397,12 +422,11 @@ tasks
         dependsOn(ensureAndroidSdk)
     }
 
-// Gap #9b: KGP-generated bridge boilerplate and KotlinCoroutineSupport runtime
-// produce warnings (unchecked casts, unused expressions, opt-in requirements)
-// that cannot be fixed in source — they are regenerated every build.
+// Generated bridge/runtime Kotlin is held to the same diagnostics as project code.
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask<*>>().configureEach {
-    if (name.startsWith("compileSwiftExport")) {
-        compilerOptions.allWarningsAsErrors.set(false)
+    compilerOptions.allWarningsAsErrors.set(true)
+    doFirst {
+        check(compilerOptions.allWarningsAsErrors.get()) { "Warnings-as-errors disabled for $path" }
     }
 }
 
@@ -442,6 +466,7 @@ kotlin {
         allWarningsAsErrors.set(true)
         optIn.addAll(commonOptIns)
         freeCompilerArgs.addAll("-Xexpect-actual-classes", "-Xsuppress-version-warnings")
+        freeCompilerArgs.addAll(extraKotlinCompilerArgs)
     }
 
     val xcf = XCFramework(frameworkName)
@@ -601,14 +626,30 @@ kotlin {
     // and fails loudly if neither is available.
     // ========================================================================
     if (nativeFfiEnabled) {
-        fun ensureKonanDependency(name: String, konanDeps: File, execOps: ExecOperations) {
+        fun ensureKonanDependency(name: String, konanDeps: File, execOps: ExecOperations): File {
+            val compilerDependencies = File(projectKonanDataDirectory.get(), "dependencies")
+            val compilerDirectory = File(compilerDependencies, name)
+            val compilerReceipt = File(compilerDependencies, ".extracted")
+            if (
+                compilerReceipt.isFile &&
+                name in compilerReceipt.readLines() &&
+                compilerDirectory.isDirectory &&
+                compilerDirectory.list()?.isNotEmpty() == true
+            ) {
+                return compilerDirectory
+            }
             val targetDir = File(konanDeps, name)
-            if (targetDir.exists()) return
+            if (targetDir.isDirectory && targetDir.list()?.isNotEmpty() == true) return targetDir
             konanDeps.mkdirs()
             val cacheDir = File(konanDeps, "cache").apply { mkdirs() }
             val archive = File(cacheDir, "$name.tar.gz")
             val url = "https://download.jetbrains.com/kotlin/native/$name.tar.gz"
             if (!archive.exists() || archive.length() == 0L) {
+                if (gradle.startParameter.isOffline) {
+                    throw GradleException(
+                        "Missing Kotlin/Native dependency $name in $konanDeps; offline mode forbids downloading $url",
+                    )
+                }
                 println("Downloading Kotlin/Native dependency $name from $url ...")
                 execOps
                     .exec {
@@ -620,6 +661,8 @@ kotlin {
                 .exec {
                     commandLine("tar", "-xzf", archive.absolutePath, "-C", konanDeps.absolutePath)
                 }.assertNormalExitValue()
+            check(targetDir.isDirectory && targetDir.list()?.isNotEmpty() == true) { "Native wrapper dependency extraction produced no directory: $targetDir" }
+            return targetDir
         }
 
         targets.withType<KotlinNativeTarget> {
@@ -640,13 +683,22 @@ kotlin {
                     val outFile = File(outDir, "$ffiWrapperBase.a")
                     inputs.file(cSource)
                     inputs.file(hSource)
+                    if (konanTargetName.startsWith("linux")) {
+                        inputs.file("verification/verify_native_archive.py")
+                        outputs.file(File(outDir, "native-archive-verification.json"))
+                    }
                     outputs.file(outFile)
 
                     doLast {
                         outDir.mkdirs()
                         if (outFile.exists()) outFile.delete()
+                        if (konanTargetName.startsWith("linux")) File(outDir, "native-archive-verification.json").delete()
                         val tempObj = File(outDir, "$ffiWrapperBase.o")
-                        val konanDeps = File(System.getProperty("user.home"), ".konan/dependencies")
+                        val konanDeps =
+                            layout.buildDirectory
+                                .dir("native-wrapper-dependencies")
+                                .get()
+                                .asFile
                         val isMac =
                             org.gradle.internal.os.OperatingSystem
                                 .current()
@@ -694,9 +746,8 @@ kotlin {
 
                             konanTargetName.startsWith("android") -> {
                                 val hostToolchain = if (isMac) "osx" else "linux"
-                                ensureKonanDependency("target-toolchain-2-$hostToolchain-android_ndk", konanDeps, execOps)
+                                val ndkDir = ensureKonanDependency("target-toolchain-2-$hostToolchain-android_ndk", konanDeps, execOps)
                                 ensureKonanDependency("target-sysroot-1-android_ndk", konanDeps, execOps)
-                                val ndkDir = File(konanDeps, "target-toolchain-2-$hostToolchain-android_ndk")
                                 val sysroot = File(ndkDir, "sysroot")
                                 val clangBin =
                                     if (konanTargetName.contains("arm64")) {
@@ -738,23 +789,26 @@ kotlin {
                                         "x86_64-unknown-linux-gnu" to "x86_64-unknown-linux-gnu-gcc-8.3.0-glibc-2.19-kernel-4.9-2"
                                     }
                                 if (isLinux) {
+                                    val gccDirectory = ensureKonanDependency(gccDirName, konanDeps, execOps)
+                                    val sysroot = File(gccDirectory, "$targetTriple/sysroot")
+                                    require(sysroot.isDirectory) { "Missing target sysroot for $konanTargetName: $sysroot" }
                                     execOps
                                         .exec {
-                                            commandLine("clang", "-Wall", "-Wextra", "-Werror", "-c", "-I${cSource.parent}", cSource.absolutePath, "-o", tempObj.absolutePath)
+                                            commandLine("clang", "--target=$targetTriple", "--sysroot=${sysroot.absolutePath}", "-fPIC", "-Wall", "-Wextra", "-Werror", "-c", "-I${cSource.parent}", cSource.absolutePath, "-o", tempObj.absolutePath)
                                         }.assertNormalExitValue()
                                     execOps
                                         .exec {
                                             commandLine("ar", "rcs", outFile.absolutePath, tempObj.absolutePath)
                                         }.assertNormalExitValue()
                                 } else if (isMac) {
-                                    ensureKonanDependency(gccDirName, konanDeps, execOps)
-                                    ensureKonanDependency("target-toolchain-2-osx-android_ndk", konanDeps, execOps)
-                                    val sysroot = File(konanDeps, "$gccDirName/$targetTriple/sysroot")
-                                    val llvmAr = File(konanDeps, "target-toolchain-2-osx-android_ndk/bin/llvm-ar")
+                                    val gccDirectory = ensureKonanDependency(gccDirName, konanDeps, execOps)
+                                    val ndkDirectory = ensureKonanDependency("target-toolchain-2-osx-android_ndk", konanDeps, execOps)
+                                    val sysroot = File(gccDirectory, "$targetTriple/sysroot")
+                                    val llvmAr = File(ndkDirectory, "bin/llvm-ar")
                                     if (sysroot.exists() && llvmAr.exists()) {
                                         execOps
                                             .exec {
-                                                commandLine("clang", "--target=$targetTriple", "--sysroot=${sysroot.absolutePath}", "-Wall", "-Wextra", "-Werror", "-c", "-I${cSource.parent}", cSource.absolutePath, "-o", tempObj.absolutePath)
+                                                commandLine("clang", "--target=$targetTriple", "--sysroot=${sysroot.absolutePath}", "-fPIC", "-Wall", "-Wextra", "-Werror", "-c", "-I${cSource.parent}", cSource.absolutePath, "-o", tempObj.absolutePath)
                                             }.assertNormalExitValue()
                                         execOps
                                             .exec {
@@ -771,8 +825,7 @@ kotlin {
                             }
 
                             konanTargetName.startsWith("mingw") -> {
-                                ensureKonanDependency("msys2-mingw-w64-x86_64-2", konanDeps, execOps)
-                                val mingwSysroot = File(konanDeps, "msys2-mingw-w64-x86_64-2")
+                                val mingwSysroot = ensureKonanDependency("msys2-mingw-w64-x86_64-2", konanDeps, execOps)
                                 val arExe = File(mingwSysroot, "bin/ar.exe")
                                 if (isWindows && mingwSysroot.exists()) {
                                     execOps
@@ -784,8 +837,8 @@ kotlin {
                                             commandLine(if (arExe.exists()) arExe.absolutePath else "ar", "rcs", outFile.absolutePath, tempObj.absolutePath)
                                         }.assertNormalExitValue()
                                 } else if (isMac) {
-                                    ensureKonanDependency("target-toolchain-2-osx-android_ndk", konanDeps, execOps)
-                                    val llvmAr = File(konanDeps, "target-toolchain-2-osx-android_ndk/bin/llvm-ar")
+                                    val ndkDirectory = ensureKonanDependency("target-toolchain-2-osx-android_ndk", konanDeps, execOps)
+                                    val llvmAr = File(ndkDirectory, "bin/llvm-ar")
                                     if (mingwSysroot.exists() && llvmAr.exists()) {
                                         execOps
                                             .exec {
@@ -810,10 +863,24 @@ kotlin {
                                 if (prebuilt.exists()) prebuilt.copyTo(outFile, overwrite = true)
                             }
                         }
-                        tempObj.delete()
                         if (!outFile.exists() || outFile.length() == 0L) {
                             throw GradleException("compile${ffiName}Wrapper failed: output library does not exist for $konanTargetName at ${outFile.absolutePath}")
                         }
+                        if (konanTargetName.startsWith("linux")) {
+                            val arguments =
+                                mutableListOf(
+                                    "python3",
+                                    file("verification/verify_native_archive.py").absolutePath,
+                                    outFile.absolutePath,
+                                    "--target",
+                                    konanTargetName,
+                                    "--report",
+                                    File(outDir, "native-archive-verification.json").absolutePath,
+                                )
+                            if (tempObj.isFile) arguments.addAll(listOf("--object", tempObj.absolutePath))
+                            execOps.exec { commandLine(arguments) }.assertNormalExitValue()
+                        }
+                        tempObj.delete()
                     }
                 }
 
@@ -851,6 +918,7 @@ kotlin {
         }
         commonMain.dependencies {
             implementation(commonMainDependencyBundle)
+            commonMainApiDependencyBundle?.let { api(it) }
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -1527,42 +1595,29 @@ tasks.register("hostTests") {
     )
 }
 
-// Patch generated SPM Package.swift to include minimum macOS platform for Swift Concurrency
-tasks.matching { it.name.contains("GenerateSPMPackage") }.configureEach {
+// KGP generates separate Swift modules for project and dependency APIs. Set the
+// package language mode explicitly; do not rewrite their generated Swift sources.
+val strictSwiftConfiguration = layout.projectDirectory.file("verification/strict-swift.xcconfig")
+tasks.matching { it.name.endsWith("generateSPMPackage", ignoreCase = true) }.configureEach {
     doLast {
-        val spmDir =
-            layout.buildDirectory
-                .dir("SPMPackage")
-                .orNull
-                ?.asFile
-        if (spmDir != null && spmDir.exists()) {
-            spmDir.walkTopDown().filter { it.name == "Package.swift" }.forEach { file ->
-                var text = file.readText()
-                if (text.contains("swift-tools-version: 6.0")) {
-                    text = text.replace("swift-tools-version: 6.0", "swift-tools-version: 5.9")
-                }
-                if (!text.contains("platforms:")) {
-                    text =
-                        text.replaceFirst(
-                            Regex("""(let package = Package\s*\(\s*name:\s*"[^"]*",)"""),
-                            "$1\n    platforms: [.macOS(\"15.0\")],",
-                        )
-                } else if (text.contains(".macOS(.v15)") || text.contains(".macOS(.v14)")) {
-                    text = text.replace(".macOS(.v15)", ".macOS(\"15.0\")").replace(".macOS(.v14)", ".macOS(\"15.0\")")
-                }
-                file.writeText(text)
-            }
-            spmDir.walkTopDown().filter { it.name == "OrgJetbrainsKotlinxKotlinxSerializationCore.swift" }.forEach { file ->
-                val text = file.readText()
-                val cleaned =
-                    text.replace(
-                        Regex("""@_spi\([^)]+\)\s+public func (?:decodeSequentially|shouldEncodeElementDefault|encodeNotNullMark)\([^)]*\)(?:\s*->\s*[^\n{]+)?\s*\{\s*fatalError\([^)]+\)\s*\}"""),
-                        "",
-                    )
-                if (cleaned != text) {
-                    file.writeText(cleaned)
-                }
-            }
+        val manifests = layout.buildDirectory.dir("SPMPackage").get().asFile
+            .walkTopDown().filter { it.isFile && it.name == "Package.swift" }.toList()
+        check(manifests.isNotEmpty()) { "No generated Swift package manifests" }
+        val execOperations = serviceOf<ExecOperations>()
+        manifests.forEach { manifest ->
+            execOperations.exec {
+                commandLine("python3", layout.projectDirectory.file("verification/enforce_swift6.py").asFile,
+                    manifest, "--receipt", manifest.parentFile.resolve("swift6-manifest-receipt.json"))
+            }.assertNormalExitValue()
+        }
+    }
+}
+tasks.matching { it.name.endsWith("buildSPMPackage", ignoreCase = true) }.configureEach {
+    inputs.file(strictSwiftConfiguration)
+    doFirst {
+        val actual = providers.environmentVariable("XCODE_XCCONFIG_FILE").orNull
+        check(actual != null && file(actual).canonicalFile == strictSwiftConfiguration.asFile.canonicalFile) {
+            "Set XCODE_XCCONFIG_FILE=${strictSwiftConfiguration.asFile} for strict Swift 6 dependency compilation"
         }
     }
 }
@@ -1610,6 +1665,7 @@ tasks.register("swiftExportSmokeTest") {
                         "FRAMEWORKS_FOLDER_PATH" to "Frameworks",
                         "MACOSX_DEPLOYMENT_TARGET" to "15.0",
                         "DEPLOYMENT_TARGET_SETTING_NAME" to "MACOSX_DEPLOYMENT_TARGET",
+                        "XCODE_XCCONFIG_FILE" to strictSwiftConfiguration.asFile.absolutePath,
                     ),
                 )
             }.assertNormalExitValue()
@@ -1620,11 +1676,46 @@ tasks.register("swiftExportSmokeTest") {
                 commandLine("swift", "package", "reset")
             }.assertNormalExitValue()
 
-        execOperations
-            .exec {
+        // Xcode toolchains find Testing.framework on their own. A Command Line Tools
+        // toolchain builds the harness but silently runs zero Swift Testing tests unless
+        // its own Frameworks directory is on the search and runtime paths. Never point an
+        // Xcode toolchain at the Command Line Tools copy: its @Suite macro would not match.
+        val developerDir =
+            ByteArrayOutputStream().use { out ->
+                execOperations
+                    .exec {
+                        commandLine("xcode-select", "-p")
+                        standardOutput = out
+                    }.assertNormalExitValue()
+                out.toString().trim()
+            }
+        val swiftTestCommand = mutableListOf("swift", "test", "-v",
+            "-Xswiftc", "-swift-version", "-Xswiftc", "6", "-Xswiftc", "-warnings-as-errors")
+        if (developerDir.endsWith("CommandLineTools")) {
+            val frameworks = "$developerDir/Library/Developer/Frameworks"
+            swiftTestCommand +=
+                listOf(
+                    "-Xswiftc", "-F", "-Xswiftc", frameworks,
+                    "-Xlinker", "-F", "-Xlinker", frameworks,
+                    "-Xlinker", "-rpath", "-Xlinker", frameworks,
+                    "-Xlinker", "-rpath", "-Xlinker", "$developerDir/Library/Developer/usr/lib",
+                )
+        }
+        val swiftTestOutput = ByteArrayOutputStream()
+        val swiftTestResult =
+            execOperations.exec {
                 workingDir = layout.projectDirectory.dir("swift-test-harness").asFile
-                commandLine("swift", "test")
-            }.assertNormalExitValue()
+                commandLine(swiftTestCommand)
+                standardOutput = swiftTestOutput
+                errorOutput = swiftTestOutput
+                isIgnoreExitValue = true
+            }
+        val swiftTestLog = swiftTestOutput.toString()
+        println(swiftTestLog)
+        swiftTestResult.assertNormalExitValue()
+        if (!swiftTestLog.contains(Regex("""Test run with [1-9]\d* tests?"""))) {
+            throw GradleException("swift test ran no Swift Testing tests (toolchain: $developerDir)")
+        }
     }
 }
 
@@ -1716,3 +1807,180 @@ tasks.register("testClasses") {
         "wasmWasiTestClasses",
     )
 }
+
+// Kotlin/Wasm's generated WASI test driver preopens no directories (KT-65179), so
+// filesystem tests cannot reach any path. project.wasmWasi.testPreopens lists guest
+// directories to map onto fresh host temporary directories for wasmWasiNodeTest.
+val wasmWasiTestPreopens =
+    providers
+        .gradleProperty("project.wasmWasi.testPreopens")
+        .getOrElse("")
+        .split(',')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+
+if (wasmWasiTestPreopens.isNotEmpty()) {
+    tasks.named("wasmWasiNodeTest") {
+        val driverDir = layout.buildDirectory.dir("compileSync/wasmWasi/test/testDevelopmentExecutable/kotlin")
+        val hostRoot = layout.buildDirectory.dir("tmp/wasmWasiTestPreopens")
+        doFirst {
+            val driver =
+                driverDir
+                    .get()
+                    .asFile
+                    .listFiles { file -> file.name.endsWith("-test.mjs") }
+                    ?.singleOrNull()
+                    ?: throw GradleException("wasmWasi test driver not found in ${driverDir.get().asFile}")
+            val root = hostRoot.get().asFile
+            root.deleteRecursively()
+            val mappings =
+                wasmWasiTestPreopens.mapIndexed { index, guest ->
+                    val host = root.resolve("preopen-$index").apply { mkdirs() }
+                    val hostPath = host.absolutePath.replace("\\", "\\\\")
+                    "'$guest': '$hostPath'"
+                }
+            val text = driver.readText()
+            if (!text.contains("preopens:")) {
+                val patched =
+                    text.replaceFirst(
+                        Regex("""new WASI\(\{"""),
+                        "new WASI({ preopens: { ${mappings.joinToString(", ")} },",
+                    )
+                if (patched == text) throw GradleException("Could not add preopens to ${driver.name}")
+                driver.writeText(patched)
+            }
+        }
+    }
+}
+
+// kotlinmania:android-publication:v1 begin
+// The Android KMP plugin owns the single Android Maven publication.
+// Verify its real staged payload; never attach a second AAR publication.
+val androidPublicationRoot = providers.provider {
+    publishing.publications.getByName("kotlinMultiplatform") as MavenPublication
+}
+val androidPublicationBundle = tasks.register<Zip>("androidPublicationBundle") {
+    group = "verification"
+    // A root publication can require shared Native/cinterop metadata. Never initiate
+    // its Apple compilation from the Linux Android job.
+    val externalRoot = providers.gradleProperty("project.publication.android.rootStagingDirectory").orNull
+    val root = androidPublicationRoot.get()
+    val coordinatePath = "${root.groupId.replace('.', '/')}/${root.artifactId}"
+    dependsOn(tasks.named<PublishToMavenRepository>("publishAndroidPublicationToCentralPortalStagingRepository"))
+    from(layout.buildDirectory.dir("staging-deploy")) {
+        include("$coordinatePath-android/${root.version}/**")
+    }
+    if (externalRoot == null) {
+        val hasAppleTargets = kotlin.targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>()
+            .any { it.konanTarget.family.isAppleFamily }
+        check(!hasAppleTargets || providers.systemProperty("os.name").get().startsWith("Mac")) {
+            "Stage the real KMP root on macOS, then set project.publication.android.rootStagingDirectory and expectedRootHead"
+        }
+        dependsOn(tasks.named<PublishToMavenRepository>("publishKotlinMultiplatformPublicationToCentralPortalStagingRepository"))
+        from(layout.buildDirectory.dir("staging-deploy")) {
+            include("$coordinatePath/${root.version}/**")
+        }
+    } else {
+        val rootDirectory = file(externalRoot)
+        val sourceReceipt = file("$externalRoot.source-head")
+        val expectedHead = providers.gradleProperty("project.publication.android.expectedRootHead")
+        inputs.file(sourceReceipt)
+        inputs.property("expectedRootHead", expectedHead)
+        from(rootDirectory) { include("$coordinatePath/${root.version}/**") }
+        doFirst {
+            val head = expectedHead.orNull
+            check(head != null && head.matches(Regex("[0-9a-f]{40}"))) { "Set expectedRootHead to the exact source commit" }
+            check(rootDirectory.isDirectory && sourceReceipt.isFile && sourceReceipt.readText().trim() == head) {
+                "Missing or stale same-head KMP root staging receipt: $sourceReceipt"
+            }
+            check(file("$externalRoot/$coordinatePath/${root.version}/${root.artifactId}-${root.version}.module").isFile) {
+                "Missing real KMP root module metadata in $rootDirectory"
+            }
+        }
+    }
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    archiveFileName.set("android-publication.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("verification"))
+}
+val verifyAndroidPublication = tasks.register<Exec>("verifyAndroidPublication") {
+    group = "verification"
+    description = "Checks Android AAR bytecode, root redirects, POM and API/runtime metadata."
+    dependsOn(androidPublicationBundle)
+    val script = rootProject.layout.projectDirectory.file("verification/verify_android_publication.py")
+    val bundle = androidPublicationBundle.flatMap { it.archiveFile }
+    val receipt = layout.buildDirectory.file("reports/publication/android.json")
+    inputs.files(script, bundle)
+    val classes = providers.gradleProperty("project.publication.android.publicClasses").orElse("")
+    val edges = providers.gradleProperty("project.publication.android.apiDependencies").orElse("")
+    inputs.property("publicClasses", classes)
+    inputs.property("apiDependencies", edges)
+    outputs.file(receipt)
+    doFirst {
+        val publicClasses = classes.get().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        check(publicClasses.isNotEmpty()) { "Set project.publication.android.publicClasses to actual public .class paths" }
+        val root = androidPublicationRoot.get()
+        commandLine(listOf(
+            "python3", script.asFile.absolutePath, bundle.get().asFile.absolutePath,
+            "--group", root.groupId, "--module", root.artifactId, "--version", root.version,
+            "--receipt", receipt.get().asFile.absolutePath,
+        ) + publicClasses.flatMap { listOf("--public-class", it) } +
+            edges.get().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                .flatMap { listOf("--api-dependency", it) })
+    }
+}
+tasks.named("publishToCentralPortal") { dependsOn(verifyAndroidPublication) }
+// Validate declared common pins before the release ZIP is assembled. This task is
+// not a dependency of Android-only verification: transported root staging remains host scoped.
+val verifyPublicationPins = tasks.register<Exec>("verifyPublicationPins") {
+    group = "verification"
+    description = "Checks staged root/Android dependency versions before release bundling."
+    dependsOn("publishKotlinMultiplatformPublicationToCentralPortalStagingRepository",
+        "publishAndroidPublicationToCentralPortalStagingRepository")
+    val sourceHead = providers.exec {
+        workingDir(projectDir)
+        commandLine("git", "rev-parse", "HEAD")
+    }.standardOutput.asText.map { it.trim() }
+    val script = rootProject.layout.projectDirectory.file("verification/verify_publication_pins.py")
+    val repository = layout.buildDirectory.dir("staging-deploy")
+    val receipt = layout.buildDirectory.file("reports/publication/dependency-pins.json")
+    val pomMappings = providers.gradleProperty("project.publication.android.pomDependencyModules").orElse("")
+    inputs.files(script, rootProject.layout.projectDirectory.file("gradle/libs.versions.toml"),
+        rootProject.layout.projectDirectory.file("gradle.properties"), layout.projectDirectory.file("build.gradle.kts"))
+    inputs.dir(repository)
+    inputs.property("sourceHead", sourceHead)
+    inputs.property("pomDependencyModules", pomMappings)
+    outputs.file(receipt)
+    doFirst {
+        val expected = linkedMapOf<String, String>()
+        // Public Gradle configuration dependency APIs retain direct and catalog bundle declarations.
+        for (name in listOf("commonMainApi", "commonMainImplementation")) {
+            for (dependency in configurations.getByName(name).dependencies) {
+                check(dependency is org.gradle.api.artifacts.ExternalModuleDependency) {
+                    "Unsupported common dependency layout in $name; review publication pins explicitly"
+                }
+                val key = "${dependency.group}:${dependency.name}"
+                val pinned = dependency.versionConstraint.requiredVersion
+                check(!dependency.group.isNullOrBlank() && pinned.isNotBlank() &&
+                    !pinned.startsWith("latest.") && pinned.none { it in "+[]()," }) {
+                    "Publication requires an exact dependency version: $key"
+                }
+                check(expected.put(key, pinned).let { it == null || it == pinned }) {
+                    "Conflicting declared publication versions: $key"
+                }
+            }
+        }
+        val stdlib = "org.jetbrains.kotlin:kotlin-stdlib"
+        check(expected.put(stdlib, kotlinVersion).let { it == null || it == kotlinVersion }) {
+            "Declared Kotlin stdlib disagrees with kotlinVersion"
+        }
+        val root = androidPublicationRoot.get()
+        commandLine(listOf("python3", script.asFile.absolutePath, repository.get().asFile.absolutePath,
+            "--group", root.groupId, "--module", root.artifactId, "--version", root.version,
+            "--source-head", sourceHead.get(), "--receipt", receipt.get().asFile.absolutePath) +
+            expected.flatMap { (key, pin) -> listOf("--dependency", "$key:$pin") } +
+            pomMappings.get().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                .flatMap { listOf("--pom-dependency", it) })
+    }
+}
+tasks.named("centralPortalBundle") { dependsOn(verifyPublicationPins) }
+// kotlinmania:android-publication:v1 end

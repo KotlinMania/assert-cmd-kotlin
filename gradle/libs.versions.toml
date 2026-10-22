@@ -5,7 +5,6 @@ serialization = "1.11.0"
 datetime = "0.8.0"
 collectionsImmutable = "0.5.2"
 androidKmp = "9.4.1"
-anstyle = "0.1.5"
 detekt = "2.0.0-alpha.6"
 ktlint = "14.2.0"
 ktlintEngine = "1.8.0"
@@ -26,15 +25,10 @@ kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "datetime" }
 collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "collectionsImmutable" }
-anstyle = { module = "io.github.kotlinmania:anstyle-kotlin", version.ref = "anstyle" }
 kotlinx-benchmark-runtime = { module = "org.jetbrains.kotlinx:kotlinx-benchmark-runtime", version.ref = "kotlinxBenchmark" }
 
 [bundles]
 assertcmd-commonMain = [
   "kotlinx-coroutines-core",
-  "kotlinx-serialization-core",
-  "kotlinx-serialization-json",
-  "kotlinx-datetime",
   "collections-immutable",
-  "anstyle",
 ]

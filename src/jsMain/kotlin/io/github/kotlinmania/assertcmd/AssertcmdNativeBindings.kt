@@ -17,16 +17,16 @@
  * the package namespace, so the module's public API surface in Swift is
  * unaffected.
  *
- * For a real port: replace `TemplateNativeBindings` / `@JsModule` name with
+ * For a real port: replace `AssertcmdNativeBindings` / `@JsModule` name with
  * the per-project npm package (e.g. `@kotlinmania/png-native-bindings`) and
  * declare the crate's N-API functions. The N-API function signatures on the
  * C++ side (native/node-ffi/src/) use fixed-width int32/int64 — there is
  * no pointer-sized type in the N-API ABI.
  */
-package io.github.kotlinmania.template
+package io.github.kotlinmania.assertcmd
 
-@JsModule("@kotlinmania/template-native-bindings")
-public external interface TemplateNativeBindings {
+@JsModule("@kotlinmania/assertcmd-native-bindings")
+public external interface AssertcmdNativeBindings {
     /** Returns the calling process ID. Hello-world export matching
      * the C++ `getpid` registration in `native/node-ffi/src/ffi_bindings.cpp`.
      */

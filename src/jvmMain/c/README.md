@@ -52,8 +52,8 @@ are the first place to look.
 
 The template default pairs:
 
-- C symbol: `Java_io_github_kotlinmania_template_internal_FfiJni_getpid`
-- Kotlin: `internal object FfiJni` in `io.github.kotlinmania.template.internal`
+- C symbol: `Java_io_github_kotlinmania_assertcmd_internal_FfiJni_getpid`
+- Kotlin: `internal object FfiJni` in `io.github.kotlinmania.assertcmd.internal`
   declaring `@JvmStatic external fun getpid(): Int`
 
 ## Keeping the bridge invisible to Swift Export

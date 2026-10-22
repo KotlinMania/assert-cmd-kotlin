@@ -26,7 +26,7 @@
  * `java.lang.UnsatisfiedLinkError` only when jvmTest runs.
  *
  * For the template default the Kotlin bridge is
- * `internal object FfiJni` in `io.github.kotlinmania.template.internal`,
+ * `internal object FfiJni` in `io.github.kotlinmania.assertcmd.internal`,
  * hence the symbol below.
  */
 #include <jni.h>
@@ -53,7 +53,7 @@ extern "C" {
  * comment above).
  */
 JNIEXPORT jint JNICALL
-Java_io_github_kotlinmania_template_internal_FfiJni_getpid(
+Java_io_github_kotlinmania_assertcmd_internal_FfiJni_getpid(
     JNIEnv* env, jclass clazz) {
     (void)env; (void)clazz;
 #ifndef _WIN32
