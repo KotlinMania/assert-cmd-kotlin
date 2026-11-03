@@ -7,7 +7,7 @@
     "lang": "rust"
   },
   "target": {
-    "path": "src/commonMain/kotlin/io/github/kotlinmania/assertcmd",
+    "path": "src/common/commonMain/kotlin/io/github/kotlinmania/assertcmd",
     "lang": "kotlin"
   },
   "checks": {
