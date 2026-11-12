@@ -1,4 +1,6 @@
 [versions]
+anstyle = "0.1.6"
+androidxTestRunner = "1.7.0"
 kotlin = "2.4.21"
 coroutines = "1.11.0"
 serialization = "1.11.0"
@@ -21,6 +23,8 @@ kotlinx-benchmark = { id = "org.jetbrains.kotlinx.benchmark", version.ref = "kot
 kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "kotlin" }
 
 [libraries]
+anstyle = { module = "io.github.kotlinmania:anstyle-kotlin", version.ref = "anstyle" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "serialization" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
@@ -30,6 +34,7 @@ kotlinx-benchmark-runtime = { module = "org.jetbrains.kotlinx:kotlinx-benchmark-
 
 [bundles]
 assertcmd-commonMain = [
+  "anstyle",
   "kotlinx-coroutines-core",
   "collections-immutable",
 ]
